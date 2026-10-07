@@ -1,0 +1,645 @@
+# Academic Question Answering System Using RAG
+
+[![FastAPI](https://img.shields.io/badge/FastAPI-0.142+-009688?style=flat&logo=fastapi&logoColor=white)](https://fastapi.tiangolo.com)
+[![LangChain](https://img.shields.io/badge/LangChain-v1.4+-1C3C3C?style=flat&logo=chainlink&logoColor=white)](https://www.langchain.com)
+[![ChromaDB](https://img.shields.io/badge/ChromaDB-Persistent-FF6F00?style=flat)](https://www.trychroma.com)
+[![React](https://img.shields.io/badge/React-19+-61DAFB?style=flat&logo=react&logoColor=black)](https://react.dev)
+[![TailwindCSS](https://img.shields.io/badge/TailwindCSS-v4+-38B2AC?style=flat&logo=tailwind-css&logoColor=white)](https://tailwindcss.com)
+[![Python](https://img.shields.io/badge/Python-3.10%20%7C%203.11%20%7C%203.12%20%7C%203.13-3776AB?style=flat&logo=python&logoColor=white)](https://www.python.org)
+[![License](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
+
+An academic-grade **Retrieval-Augmented Generation (RAG)** web application designed for students, researchers, and educators. Upload lecture notes, syllabus documents, textbooks, and research papers (PDF) to ask deep technical questions. Answers are **strictly grounded** in your uploaded materials and include verifiable **source citations** (document name, 1-indexed page number, and text excerpts).
+
+Runs smoothly on standard 8GB RAM laptops (Windows/Linux/macOS) on CPU with zero local GPU requirements.
+
+---
+
+## Table of Contents
+- [Key Features](#key-features)
+- [System Architecture](#system-architecture)
+- [RAG Pipeline Workflow](#rag-pipeline-workflow)
+- [Tech Stack](#tech-stack)
+- [Directory Structure](#directory-structure)
+- [Configuration & Environment Variables](#configuration--environment-variables)
+- [Provider Switching (OpenAI & Ollama, HuggingFace & OpenAI)](#provider-switching)
+- [Setup & Installation (Windows Native)](#setup--installation-windows-native)
+- [Setup & Installation (Docker & Docker Compose)](#setup--installation-docker--docker-compose)
+- [API Reference & cURL Examples](#api-reference--curl-examples)
+- [Evaluation Harness](#evaluation-harness)
+- [Troubleshooting & FAQ](#troubleshooting--faq)
+- [Future Improvements](#future-improvements)
+
+---
+
+## Key Features
+
+- **Real RAG Pipeline**: No mock or hallucinated responses. Built with official LangChain split packages (`langchain-chroma`, `langchain-huggingface`, `langchain-openai`, `langchain-ollama`).
+- **Zero-Hallucination Guardrail**: A strict cosine similarity threshold prevents hallucinations. If retrieved chunks do not exceed the relevance threshold, the system immediately returns:  
+  `"I couldn't find enough information in the uploaded documents to answer this question."` without making an unnecessary LLM call.
+- **Accurate Source Citations**: Every generated answer specifies the source PDF filename, 1-indexed page number, relevance match score, and expandable text excerpt.
+- **Content Hash & Duplicate Prevention**: SHA-256 content hashing detects duplicate uploads instantly, preventing redundant embeddings and storage waste.
+- **Conversational Context Condensation**: Multi-turn conversation history is condensed by the LLM into a standalone query before vector retrieval.
+- **CPU-Friendly & 8GB RAM Certified**: Default embeddings use `sentence-transformers/all-MiniLM-L6-v2` (only ~80MB), running locally on CPU.
+- **Provider Agnostic**: Switch seamlessly between OpenAI (`gpt-4o-mini`) and local private Ollama (`llama3.2:3b`), or swap embeddings between HuggingFace and OpenAI with a single `.env` toggle.
+- **Embedding Mismatch Protection**: Vector store embeds provider/model metadata signatures; mismatches trigger explicit warnings or safe resets.
+- **Modern Responsive UI**: Clean academic dark aesthetic with drag-and-drop PDF ingestion, real-time progress indicators, copy actions, and clickable sample questions.
+
+---
+
+## System Architecture
+
+```text
++-------------------------------------------------------------------------+
+|                              FRONTEND                                   |
+|   React 19 + Vite + Tailwind CSS + Lucide Icons + React-Markdown        |
++------------------------------------+------------------------------------+
+                                     |
+                         HTTP / REST | JSON
+                                     v
++------------------------------------+------------------------------------+
+|                         FASTAPI BACKEND                                 |
+|  +----------------------+ +--------------------+ +-------------------+  |
+|  | /api/documents       | | /api/chat          | | /api/health       |  |
+|  +----------------------+ +--------------------+ +-------------------+  |
+|                                                                         |
+|  [Document Service]                     [Chat Service]                  |
+|   - Magic byte validation                - Conversational condenser     |
+|   - SHA-256 hash dedup                   - Similarity retriever         |
+|   - Text cleaner & sanitizer             - Relevance thresholding       |
+|   - PyPDFLoader extraction               - Academic prompt synthesizer  |
++---------------------+----------------------------------+----------------+
+                      |                                  |
+           Dense Embeddings                   Grounded Synthesis
+                      v                                  v
++---------------------+-------------+     +--------------+----------------+
+|          EMBEDDING LAYER          |     |           LLM LAYER           |
+|  - HuggingFace (MiniLM-L6-v2)     |     |  - OpenAI (gpt-4o-mini)       |
+|  - OpenAI (text-embedding-3-small)|     |  - Ollama (llama3.2:3b local) |
++---------------------+-------------+     +-------------------------------+
+                      |
+                      v
++---------------------+-------------+
+|        CHROMA VECTOR DB           |
+|  - Persistent storage (HNSW)      |
+|  - Cosine distance similarity     |
+|  - Collection signature metadata  |
++-----------------------------------+
+```
+
+---
+
+## RAG Pipeline Workflow
+
+```text
+[PDF Upload]
+     |
+     v
+[Validation: .pdf + MIME + %PDF- Magic Bytes + Size <= 25MB]
+     |
+     v
+[SHA-256 Hash Calculation] ---> Duplicate Found? ---> Abort with Conflict (409)
+     |
+     v
+[PyPDFLoader Page-by-Page Extraction]
+     |
+     v
+[Text Cleaning: Hyphenation fixes, control chars removed, whitespace normalized]
+     |
+     v
+[RecursiveCharacterTextSplitter: chunk_size=800, overlap=150]
+     |
+     v
+[Dense Embedding (HuggingFace / OpenAI)] ---> [ChromaDB Persistent Storage]
+
+--------------------------------------------------------------------------
+
+[Student Question + Chat History]
+     |
+     v
+[Query Condensation: Rephrase follow-up into standalone query]
+     |
+     v
+[Cosine Similarity Search (Top-k=4)]
+     |
+     v
+[Relevance Score Threshold Check (Score >= 0.30)]
+     |
+     +--- (Below threshold / 0 chunks) ---> Return: "I couldn't find enough information..."
+     |
+     +--- (Passes threshold)
+             |
+             v
+     [Context Synthesis: [Document: X, Page: Y] + Content]
+             |
+             v
+     [Academic LLM Prompt (OpenAI / Ollama)]
+             |
+             v
+     [Answer + Deduplicated Source Citations]
+```
+
+---
+
+## Tech Stack
+
+### Backend
+- **Python**: 3.10+ (tested through 3.13)
+- **FastAPI & Uvicorn**: High-performance asynchronous web framework
+- **Pydantic v2 & Pydantic-Settings**: Schema validation and environment management
+- **LangChain Ecosystem**:
+  - `langchain`, `langchain-community`, `langchain-core`
+  - `langchain-chroma`: Vector store integration
+  - `langchain-huggingface`: Local CPU sentence transformers
+  - `langchain-openai`: OpenAI GPT & embedding integration
+  - `langchain-ollama`: Local offline LLM execution
+- **PyPDF**: PDF parsing and text stream decoding
+- **ChromaDB**: Lightweight, embedded, persistent vector database
+- **Sentence-Transformers & PyTorch**: Lightweight local embedding model (`all-MiniLM-L6-v2`)
+
+### Frontend
+- **React 19**: Modern component architecture
+- **Vite 6/8**: Blazing fast ESM development and production bundler
+- **Tailwind CSS v4**: Utility-first responsive design
+- **Axios**: Network requests with progress tracking
+- **React-Markdown**: Academic formatting for code, lists, and tables
+- **Lucide React**: Clean icons
+
+---
+
+## Directory Structure
+
+```text
+academic-rag-system/
+├── backend/
+│   ├── app/
+│   │   ├── api/
+│   │   │   ├── chat.py             # POST /api/chat
+│   │   │   ├── documents.py        # Upload, list, delete routes
+│   │   │   └── health.py           # GET /api/health
+│   │   ├── core/
+│   │   │   ├── config.py           # Pydantic Settings
+│   │   │   ├── exceptions.py       # Custom HTTP exceptions
+│   │   │   └── logging.py          # Structured logging
+│   │   ├── models/
+│   │   │   ├── chat.py             # ChatRequest, ChatResponse, SourceCitation
+│   │   │   ├── document.py         # DocumentMetadata, UploadResponse
+│   │   │   └── health.py           # HealthResponse
+│   │   ├── rag/
+│   │   │   ├── cleaner.py          # PDF text normalizer & hyphenation fixer
+│   │   │   ├── embeddings.py       # Singleton embedding factory
+│   │   │   ├── generator.py        # LLM factory (OpenAI / Ollama)
+│   │   │   ├── loader.py           # PyPDFLoader wrapper with validation
+│   │   │   ├── pipeline.py         # End-to-end RAG orchestrator
+│   │   │   ├── prompts.py          # Academic system prompt & condenser
+│   │   │   ├── retriever.py        # Vector search with score thresholding
+│   │   │   ├── splitter.py         # RecursiveCharacterTextSplitter wrapper
+│   │   │   └── vectorstore.py      # ChromaDB client & collection manager
+│   │   ├── services/
+│   │   │   ├── chat_service.py     # Chat business logic
+│   │   │   └── document_service.py # Ingestion & deletion logic
+│   │   ├── utils/
+│   │   │   ├── file_utils.py       # Magic bytes, hash & size formatting
+│   │   │   └── manifest.py         # Persistent document metadata store
+│   │   └── main.py                 # FastAPI application & CORS setup
+│   ├── chroma_db/                  # Persistent Chroma storage directory
+│   ├── sample_documents/           # Sample academic PDFs (DBMS, Networks, Cloud)
+│   ├── uploads/                    # Physical PDF storage directory
+│   ├── create_sample_academic_pdfs.py # Generator for multi-page study PDFs
+│   ├── evaluate.py                 # 5 benchmark evaluation questions
+│   ├── ingest_sample_docs.py       # Helper to seed sample PDFs
+│   ├── test_backend_pipeline.py    # Automated pipeline unit verification
+│   ├── requirements.txt            # Pinned Python dependencies
+│   ├── Dockerfile                  # Production container definition
+│   └── .env.example                # Backend environment template
+├── frontend/
+│   ├── src/
+│   │   ├── components/
+│   │   │   ├── ChatArea.jsx        # Messages stream & example questions
+│   │   │   ├── ChatMessage.jsx     # Markdown bubbles & citation views
+│   │   │   ├── DocumentList.jsx    # Ingested documents list & deletion
+│   │   │   ├── Header.jsx          # Status badges & model details
+│   │   │   ├── SourceCitations.jsx # Collapsible page & snippet badges
+│   │   │   ├── Toast.jsx           # Notification alerts
+│   │   │   └── UploadCard.jsx      # Drag-and-drop upload zone & progress
+│   │   ├── services/
+│   │   │   └── api.js              # Axios client
+│   │   ├── App.jsx                 # Master application layout
+│   │   ├── index.css               # Tailwind CSS v4 & custom styles
+│   │   └── main.jsx                # React DOM root
+│   ├── index.html                  # HTML entry point
+│   ├── package.json                # Frontend dependencies
+│   ├── vite.config.js              # Vite server & proxy configuration
+│   ├── nginx.conf                  # Production Nginx reverse proxy
+│   └── Dockerfile                  # Multi-stage production container
+├── docker-compose.yml              # Multi-container orchestration
+├── .env.example                    # Global environment variables template
+├── .gitignore                      # Git exclusion rules (.env, chroma_db, etc.)
+└── README.md                       # Comprehensive documentation
+```
+
+---
+
+## Configuration & Environment Variables
+
+Copy `.env.example` to `backend/.env`:
+
+```bash
+cp .env.example backend/.env
+```
+
+### Complete Environment Variable Reference
+
+| Variable | Default Value | Description |
+| :--- | :--- | :--- |
+| `LLM_PROVIDER` | `openai` | Active LLM provider: `openai` or `ollama` |
+| `OPENAI_API_KEY` | *(empty)* | OpenAI API key (sk-...) |
+| `OPENAI_MODEL` | `gpt-4o-mini` | OpenAI chat model name |
+| `OLLAMA_MODEL` | `llama3.2:3b` | Ollama model name (e.g., `llama3.2:3b`, `mistral`) |
+| `OLLAMA_BASE_URL` | `http://localhost:11434` | Ollama server API URL |
+| `EMBEDDING_PROVIDER` | `huggingface` | Active embedding provider: `huggingface` or `openai` |
+| `HF_EMBEDDING_MODEL` | `sentence-transformers/all-MiniLM-L6-v2` | Local HuggingFace sentence transformer |
+| `OPENAI_EMBEDDING_MODEL`| `text-embedding-3-small` | OpenAI embedding model name |
+| `CHUNK_SIZE` | `800` | Target chunk size in characters |
+| `CHUNK_OVERLAP` | `150` | Overlap between consecutive chunks in characters |
+| `TOP_K` | `4` | Number of most similar chunks to retrieve |
+| `SCORE_THRESHOLD` | `0.30` | Minimum cosine similarity score for relevance |
+| `MAX_FILE_SIZE_MB` | `25` | Maximum allowed PDF upload size in megabytes |
+
+---
+
+## Provider Switching
+
+The backend is built with factory patterns (`get_llm()` and `get_embedding_function()`), making provider switching completely seamless without modifying application code.
+
+### 1. OpenAI (Default Cloud Configuration)
+In `backend/.env`:
+```env
+LLM_PROVIDER=openai
+OPENAI_API_KEY=sk-proj-your-actual-api-key-here
+OPENAI_MODEL=gpt-4o-mini
+
+EMBEDDING_PROVIDER=huggingface
+HF_EMBEDDING_MODEL=sentence-transformers/all-MiniLM-L6-v2
+```
+*Benefits*: Fast, high accuracy, highly cost-effective (`gpt-4o-mini`), with free local embeddings that keep costs minimal.
+
+### 2. 100% Offline / Local Private (Ollama)
+In `backend/.env`:
+```env
+LLM_PROVIDER=ollama
+OLLAMA_MODEL=llama3.2:3b
+OLLAMA_BASE_URL=http://localhost:11434
+
+EMBEDDING_PROVIDER=huggingface
+HF_EMBEDDING_MODEL=sentence-transformers/all-MiniLM-L6-v2
+```
+**Setup Ollama**:
+1. Download & install [Ollama](https://ollama.ai).
+2. Start the daemon:
+   ```bash
+   ollama serve
+   ```
+3. Pull the lightweight 3B model (runs smoothly on 8GB RAM):
+   ```bash
+   ollama pull llama3.2:3b
+   ```
+*Benefits*: 100% free, 100% private, no API keys, zero external internet dependencies.
+
+### 3. Switching Embedding Providers & Vector Store Mismatch Protection
+ChromaDB collections store an embedding signature (`signature = provider::model`).
+- If you change `EMBEDDING_PROVIDER` (e.g. from `huggingface` to `openai`), the vector dimensions change (384 dims vs 1536 dims).
+- The system automatically detects this mismatch and raises an `EmbeddingMismatchException` rather than returning corrupt search results.
+- To re-index with a new embedding provider:
+  ```bash
+  # Delete previous Chroma storage to rebuild
+  rmdir /s /q backend\chroma_db
+  # Re-ingest documents
+  python backend/ingest_sample_docs.py
+  ```
+
+---
+
+## Setup & Installation (Windows Native)
+
+### Prerequisites
+- Windows 10/11
+- Python 3.10+ (Python 3.13 supported)
+- Node.js 18+ and npm
+- [Git](https://git-scm.com/)
+
+---
+
+### Step 1: Clone Repository
+```powershell
+git clone <repository_url> academic-rag-system
+cd academic-rag-system
+```
+
+---
+
+### Step 2: Backend Setup
+Open a PowerShell terminal:
+
+```powershell
+# Navigate to backend directory
+cd backend
+
+# Create virtual environment
+python -m venv .venv
+
+# Activate virtual environment
+.\.venv\Scripts\Activate.ps1
+
+# Upgrade pip and install dependencies
+pip install --upgrade pip
+pip install -r requirements.txt
+
+# Copy environment file
+Copy-Item .env.example .env
+
+# (Optional) Open .env in Notepad to insert your OPENAI_API_KEY if using OpenAI
+notepad .env
+
+# Generate sample academic PDFs (DBMS, Computer Networks, Cloud Computing)
+python create_sample_academic_pdfs.py
+
+# Ingest sample PDFs into ChromaDB
+python ingest_sample_docs.py
+
+# Verify the backend RAG pipeline
+python test_backend_pipeline.py
+```
+
+#### Run the Backend Server
+```powershell
+python -m uvicorn app.main:app --host 127.0.0.1 --port 8000 --reload
+```
+The API server is now live at:
+- **API Base**: `http://127.0.0.1:8000`
+- **Interactive Swagger Docs**: `http://127.0.0.1:8000/docs`
+- **Health Endpoint**: `http://127.0.0.1:8000/api/health`
+
+---
+
+### Step 3: Frontend Setup
+Open a second PowerShell terminal:
+
+```powershell
+# Navigate to frontend directory
+cd frontend
+
+# Install npm dependencies
+npm install
+
+# Start Vite development server
+npm run dev
+```
+Open your browser at:
+**`http://localhost:5173`**
+
+---
+
+## Setup & Installation (Docker & Docker Compose)
+
+Docker packages the full frontend, backend, and ChromaDB persistence in isolated containers.
+
+### Prerequisites
+- [Docker Desktop for Windows](https://www.docker.com/products/docker-desktop/) with WSL2 backend.
+
+### Launch with Docker Compose
+From the project root:
+
+```bash
+# 1. Ensure .env is populated in backend/
+cp .env.example backend/.env
+
+# 2. Build and launch all containers
+docker compose up --build
+```
+
+- **Frontend Application**: `http://localhost:3000`
+- **Backend API**: `http://localhost:8000`
+- **Interactive API Documentation**: `http://localhost:8000/docs`
+
+To stop containers:
+```bash
+docker compose down
+```
+
+---
+
+## API Reference & cURL Examples
+
+### 1. Health & System Status
+```bash
+curl -X GET http://127.0.0.1:8000/api/health
+```
+**Response**:
+```json
+{
+  "status": "ok",
+  "llm_provider": "openai",
+  "llm_model": "gpt-4o-mini",
+  "embedding_provider": "huggingface",
+  "embedding_model": "sentence-transformers/all-MiniLM-L6-v2",
+  "document_count": 3,
+  "total_chunks": 14,
+  "collection_name": "academic_rag_docs",
+  "chroma_status": "connected",
+  "message": "Academic RAG System is operational."
+}
+```
+
+---
+
+### 2. Upload Academic PDFs (Multipart)
+```bash
+curl -X POST http://127.0.0.1:8000/api/documents/upload \
+  -F "files=@sample_documents/DBMS_Study_Notes.pdf"
+```
+**Response**:
+```json
+{
+  "success": true,
+  "uploaded": [
+    {
+      "document_id": "a9b75822-491b-419b-a010-85f269a842f5",
+      "filename": "DBMS_Study_Notes.pdf",
+      "page_count": 3,
+      "chunk_count": 5,
+      "status": "ready",
+      "message": "Successfully processed 3 pages and indexed 5 chunks."
+    }
+  ],
+  "errors": []
+}
+```
+
+---
+
+### 3. List Ingested Documents
+```bash
+curl -X GET http://127.0.0.1:8000/api/documents
+```
+**Response**:
+```json
+{
+  "total_documents": 1,
+  "total_chunks": 5,
+  "documents": [
+    {
+      "document_id": "a9b75822-491b-419b-a010-85f269a842f5",
+      "filename": "DBMS_Study_Notes.pdf",
+      "file_path": "uploads/a9b75822-491b-419b-a010-85f269a842f5_DBMS_Study_Notes.pdf",
+      "file_hash": "0f810cf16cc1db22b274530fc601...",
+      "file_size_bytes": 4485,
+      "file_size_formatted": "4.4 KB",
+      "page_count": 3,
+      "chunk_count": 5,
+      "upload_date": "2026-10-04T17:26:01.298506",
+      "status": "ready"
+    }
+  ]
+}
+```
+
+---
+
+### 4. Delete Document & Purge Vectors
+```bash
+curl -X DELETE http://127.0.0.1:8000/api/documents/a9b75822-491b-419b-a010-85f269a842f5
+```
+**Response**:
+```json
+{
+  "success": true,
+  "document_id": "a9b75822-491b-419b-a010-85f269a842f5",
+  "filename": "DBMS_Study_Notes.pdf",
+  "deleted_chunks": 5,
+  "message": "Document 'DBMS_Study_Notes.pdf' and 5 vectors successfully deleted."
+}
+```
+
+---
+
+### 5. Chat & Grounded Question Answering
+```bash
+curl -X POST http://127.0.0.1:8000/api/chat \
+  -H "Content-Type: application/json" \
+  -d '{
+    "question": "What is database normalization and what are the benefits of 3NF?",
+    "chat_history": []
+  }'
+```
+**Response**:
+```json
+{
+  "answer": "Database normalization is a systematic approach to decomposing tables to eliminate data redundancy and prevent undesirable anomalies (Insertion, Update, and Deletion anomalies).\n\nKey benefits of Third Normal Form (3NF):\n- Eliminates transitive functional dependencies on the primary key.\n- Minimizes duplicate data storage.\n- Simplifies data consistency and modification integrity.",
+  "sources": [
+    {
+      "document": "DBMS_Study_Notes.pdf",
+      "page": 2,
+      "content": "Chapter 2: Database Normalization and Normal Forms\nUnderstanding Normalization (1NF, 2NF, 3NF, BCNF)...",
+      "score": 0.7835
+    }
+  ],
+  "standalone_question": null
+}
+```
+
+---
+
+### 6. Irrelevant Question (Zero Hallucination Guardrail)
+```bash
+curl -X POST http://127.0.0.1:8000/api/chat \
+  -H "Content-Type: application/json" \
+  -d '{
+    "question": "What is the recipe for baking chocolate chip cookies?",
+    "chat_history": []
+  }'
+```
+**Response**:
+```json
+{
+  "answer": "I couldn't find enough information in the uploaded documents to answer this question.",
+  "sources": [],
+  "standalone_question": null
+}
+```
+
+---
+
+## Evaluation Harness
+
+A dedicated evaluation harness is provided in `backend/evaluate.py` to evaluate retrieval precision, cosine scores, and response latency across 5 benchmark academic questions.
+
+To run the evaluation:
+```powershell
+cd backend
+python evaluate.py
+```
+
+### Benchmark Questions Included:
+1. **DBMS**: *"What is database normalization and what are the benefits of 3NF?"* (Target: `DBMS_Study_Notes.pdf`, Page 2)
+2. **Computer Networks**: *"Explain the 7 layers of the OSI model and their key responsibilities."* (Target: `Computer_Networks_Guide.pdf`, Page 2)
+3. **Transport Layer**: *"What is the key difference between TCP and UDP in terms of reliability and overhead?"* (Target: `Computer_Networks_Guide.pdf`, Page 3)
+4. **Cloud Computing**: *"Explain the core service models of cloud computing: IaaS, PaaS, and SaaS."* (Target: `Cloud_Computing_Essentials.pdf`, Page 2)
+5. **Operating Systems (Unanswerable control query)**: *"What is the difference between preemptive and non-preemptive CPU scheduling algorithms?"* (Target: Below threshold, correctly blocked)
+
+---
+
+## Storage Locations
+
+- **Uploaded PDFs**: Stored on disk under `backend/uploads/` (prefixed with document UUID to prevent file collisions).
+- **Persistent ChromaDB Vectors**: Stored on disk under `backend/chroma_db/` (HNSW SQLite index and binary embeddings).
+- **Document Metadata Registry**: Stored in `backend/uploads/documents_manifest.json`.
+
+---
+
+## Troubleshooting & FAQ
+
+### 1. `MissingAPIKeyException: 401 Missing OpenAI API key`
+- **Cause**: `LLM_PROVIDER=openai` is selected in `backend/.env`, but `OPENAI_API_KEY` is blank or unset.
+- **Solution**: Open `backend/.env` and add your OpenAI key:
+  ```env
+  OPENAI_API_KEY=sk-proj-...
+  ```
+  Or switch to Ollama:
+  ```env
+  LLM_PROVIDER=ollama
+  ```
+
+### 2. `OllamaNotRunningException: 503 Ollama is not running`
+- **Cause**: `LLM_PROVIDER=ollama` is selected, but the Ollama daemon is not started.
+- **Solution**: Start Ollama in your terminal:
+  ```bash
+  ollama serve
+  ollama pull llama3.2:3b
+  ```
+
+### 3. `ScannedPDFException: 422 Scanned PDF or non-extractable text`
+- **Cause**: The uploaded PDF consists of scanned raster images or photos without an embedded digital text layer.
+- **Solution**: Upload PDFs generated with digital text (e.g., exported from Word, LaTeX, Google Docs, or converted with OCR).
+
+### 4. `DuplicateDocumentException: 409 Duplicate document detected`
+- **Cause**: The PDF content has the exact same SHA-256 hash as an already indexed file.
+- **Solution**: The file is already indexed. You can query it directly in the chat or delete the existing document first.
+
+### 5. `EmbeddingMismatchException: 409 Embedding configuration mismatch`
+- **Cause**: You changed `EMBEDDING_PROVIDER` or `HF_EMBEDDING_MODEL` after already creating vectors with another model.
+- **Solution**: Delete `backend/chroma_db/` and re-ingest documents so vectors match the new dimensionality.
+
+---
+
+## Future Improvements
+
+- [ ] **OCR Ingestion**: Add `pytesseract` or `easyocr` fallback for scanned handwritten lecture notes.
+- [ ] **Hybrid Search**: Combine dense embeddings with BM25 sparse lexical search (Reciprocal Rank Fusion) for exact keyword/formula queries.
+- [ ] **PDF In-Browser Highlighting**: Use PDF.js in the frontend to highlight cited bounding boxes directly on the document page.
+- [ ] **Cross-Encoder Re-ranking**: Add `cross-encoder/ms-marco-MiniLM-L-6-v2` for second-stage candidate re-ranking.
+- [ ] **User Authentication & Multi-Tenancy**: Support separate user workspaces and private study groups with SQLite/PostgreSQL auth.
+
+---
+
+## License
+MIT License. Built for students, developers, and researchers.
