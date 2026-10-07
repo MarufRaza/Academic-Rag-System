@@ -50,7 +50,7 @@ export const api = {
     return res.data;
   },
 
-  // Chat / RAG
+  // Chat / RAG (Standard blocking)
   async askQuestion(question, chatHistory = []) {
     const payload = {
       question: question.trim(),
@@ -62,6 +62,57 @@ export const api = {
 
     const res = await apiClient.post('/chat', payload);
     return res.data;
+  },
+
+  // Real-time Token Streaming via SSE
+  async askQuestionStream(question, chatHistory = [], { onToken, onSources, onStandalone, onError }) {
+    const payload = {
+      question: question.trim(),
+      chat_history: chatHistory.map((msg) => ({
+        role: msg.role,
+        content: msg.content,
+      })),
+    };
+
+    const response = await fetch(`${API_BASE_URL}/chat/stream`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify(payload),
+    });
+
+    if (!response.ok) {
+      const errJson = await response.json().catch(() => ({}));
+      throw new Error(errJson.message || `Server error ${response.status}`);
+    }
+
+    const reader = response.body.getReader();
+    const decoder = new TextDecoder();
+    let buffer = '';
+
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
+
+      buffer += decoder.decode(value, { stream: true });
+      const lines = buffer.split('\n');
+      buffer = lines.pop();
+
+      for (const line of lines) {
+        if (line.startsWith('data: ')) {
+          try {
+            const data = JSON.parse(line.slice(6));
+            if (data.type === 'token' && onToken) onToken(data.content);
+            if (data.type === 'sources' && onSources) onSources(data.sources);
+            if (data.type === 'standalone' && onStandalone) onStandalone(data.question);
+            if (data.type === 'error' && onError) onError(data.message);
+          } catch (e) {
+            // Safe JSON parse ignore
+          }
+        }
+      }
+    }
   },
 };
 

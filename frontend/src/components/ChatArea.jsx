@@ -37,50 +37,110 @@ export default function ChatArea({ documentCount, onNotify }) {
       return;
     }
 
-    const newMessages = [
-      ...messages,
-      {
-        role: 'user',
-        content: question,
-      },
-    ];
+    const userMsg = {
+      role: 'user',
+      content: question,
+    };
 
-    setMessages(newMessages);
+    const initialAssistantMsg = {
+      role: 'assistant',
+      content: '',
+      sources: [],
+      standalone_question: null,
+    };
+
+    const newMessages = [...messages, userMsg];
+    setMessages([...newMessages, initialAssistantMsg]);
     setInputQuery('');
     setIsLoading(true);
 
+    let streamedContent = '';
+    let streamedSources = [];
+    let standaloneQuestion = null;
+
     try {
-      const response = await api.askQuestion(question, messages);
-
-      setMessages([
-        ...newMessages,
-        {
-          role: 'assistant',
-          content: response.answer,
-          sources: response.sources || [],
-          standalone_question: response.standalone_question,
+      await api.askQuestionStream(question, messages, {
+        onToken: (token) => {
+          streamedContent += token;
+          setMessages((prev) => {
+            const updated = [...prev];
+            const lastIdx = updated.length - 1;
+            if (lastIdx >= 0 && updated[lastIdx].role === 'assistant') {
+              updated[lastIdx] = {
+                ...updated[lastIdx],
+                content: streamedContent,
+              };
+            }
+            return updated;
+          });
         },
-      ]);
-    } catch (err) {
-      const errorMsg =
-        err.response?.data?.message ||
-        err.response?.data?.detail ||
-        err.message ||
-        'Error retrieving answer.';
-
-      onNotify({
-        type: 'error',
-        message: errorMsg,
+        onSources: (sources) => {
+          streamedSources = sources;
+          setMessages((prev) => {
+            const updated = [...prev];
+            const lastIdx = updated.length - 1;
+            if (lastIdx >= 0 && updated[lastIdx].role === 'assistant') {
+              updated[lastIdx] = {
+                ...updated[lastIdx],
+                sources: streamedSources,
+              };
+            }
+            return updated;
+          });
+        },
+        onStandalone: (standalone) => {
+          standaloneQuestion = standalone;
+          setMessages((prev) => {
+            const updated = [...prev];
+            const lastIdx = updated.length - 1;
+            if (lastIdx >= 0 && updated[lastIdx].role === 'assistant') {
+              updated[lastIdx] = {
+                ...updated[lastIdx],
+                standalone_question: standaloneQuestion,
+              };
+            }
+            return updated;
+          });
+        },
+        onError: (err) => {
+          throw new Error(err);
+        },
       });
+    } catch (err) {
+      // Fallback to standard blocking API call if stream encountered issues
+      try {
+        const response = await api.askQuestion(question, messages);
+        setMessages([
+          ...newMessages,
+          {
+            role: 'assistant',
+            content: response.answer,
+            sources: response.sources || [],
+            standalone_question: response.standalone_question,
+          },
+        ]);
+      } catch (fallbackErr) {
+        const errorMsg =
+          fallbackErr.response?.data?.message ||
+          fallbackErr.response?.data?.detail ||
+          fallbackErr.message ||
+          err.message ||
+          'Error retrieving answer.';
 
-      setMessages([
-        ...newMessages,
-        {
-          role: 'assistant',
-          content: `⚠️ **Request Error**: ${errorMsg}`,
-          sources: [],
-        },
-      ]);
+        onNotify({
+          type: 'error',
+          message: errorMsg,
+        });
+
+        setMessages([
+          ...newMessages,
+          {
+            role: 'assistant',
+            content: `⚠️ **Request Error**: ${errorMsg}`,
+            sources: [],
+          },
+        ]);
+      }
     } finally {
       setIsLoading(false);
       if (textareaRef.current) {

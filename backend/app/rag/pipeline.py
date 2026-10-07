@@ -141,3 +141,81 @@ def execute_rag_pipeline(
         sources=sources,
         standalone_question=standalone_q if standalone_q != cleaned_question else None
     )
+
+
+def stream_rag_pipeline(
+    question: str,
+    chat_history: Optional[List[ChatMessage]] = None,
+    top_k: int = settings.TOP_K,
+    score_threshold: float = settings.SCORE_THRESHOLD,
+):
+    """
+    Generator yielding Server-Sent Events (SSE) for real-time token streaming.
+    Yields:
+    - {"type": "standalone", "question": "..."}
+    - {"type": "token", "content": "..."}
+    - {"type": "sources", "sources": [...]}
+    - {"type": "done"}
+    """
+    import json
+
+    cleaned_question = question.strip() if question else ""
+    if not cleaned_question:
+        raise EmptyQuestionException()
+
+    standalone_q = condense_followup_question(
+        question=cleaned_question,
+        chat_history=chat_history or []
+    )
+    if standalone_q != cleaned_question:
+        yield f"data: {json.dumps({'type': 'standalone', 'question': standalone_q})}\n\n"
+
+    relevant_chunks = retrieve_relevant_chunks(
+        query=standalone_q,
+        top_k=top_k,
+        score_threshold=score_threshold,
+    )
+
+    if not relevant_chunks:
+        yield f"data: {json.dumps({'type': 'token', 'content': NOT_ENOUGH_INFO_MSG})}\n\n"
+        yield f"data: {json.dumps({'type': 'sources', 'sources': []})}\n\n"
+        yield f"data: {json.dumps({'type': 'done'})}\n\n"
+        return
+
+    context_text = format_retrieved_context(relevant_chunks)
+    llm = get_llm(temperature=0.1)
+    prompt_text = ACADEMIC_RAG_PROMPT.format(
+        context=context_text,
+        question=standalone_q
+    )
+
+    # Prepare deduplicated sources
+    seen_sources = set()
+    sources = []
+    for doc, score in relevant_chunks:
+        doc_name = doc.metadata.get("filename", "Document")
+        page_num = int(doc.metadata.get("page", 1))
+        content_snippet = doc.page_content.strip()
+        source_key = (doc_name, page_num, content_snippet[:80])
+        if source_key not in seen_sources:
+            seen_sources.add(source_key)
+            sources.append({
+                "document": doc_name,
+                "page": page_num,
+                "content": content_snippet,
+                "score": round(score, 4)
+            })
+
+    try:
+        # Stream response tokens
+        for chunk in llm.stream(prompt_text):
+            token_text = chunk.content if hasattr(chunk, "content") else str(chunk)
+            if token_text:
+                yield f"data: {json.dumps({'type': 'token', 'content': token_text})}\n\n"
+    except Exception as e:
+        logger.error(f"Streaming LLM error: {e}")
+        yield f"data: {json.dumps({'type': 'error', 'message': str(e)})}\n\n"
+
+    # Send sources and completion signal
+    yield f"data: {json.dumps({'type': 'sources', 'sources': sources})}\n\n"
+    yield f"data: {json.dumps({'type': 'done'})}\n\n"

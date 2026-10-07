@@ -41,7 +41,7 @@ class DuplicateDocumentException(AcademicRAGException):
 class FileTooLargeException(AcademicRAGException):
     def __init__(self, filename: str, size_mb: float, max_mb: int):
         super().__init__(
-            status_code=status.HTTP_413_REQUEST_ENTITY_TOO_LARGE,
+            status_code=getattr(status, "HTTP_413_CONTENT_TOO_LARGE", 413),
             detail=f"File '{filename}' ({size_mb:.2f} MB) exceeds maximum allowed size of {max_mb} MB."
         )
 
