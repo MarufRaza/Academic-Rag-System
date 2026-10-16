@@ -21,11 +21,13 @@ Runs smoothly on standard 8GB RAM laptops (Windows/Linux/macOS) on CPU with zero
 - [Tech Stack](#tech-stack)
 - [Directory Structure](#directory-structure)
 - [Configuration & Environment Variables](#configuration--environment-variables)
-- [Provider Switching (OpenAI & Ollama, HuggingFace & OpenAI)](#provider-switching)
+- [Provider Switching (Gemini, OpenAI, Ollama)](#provider-switching)
+- [Using Gemini (free)](#using-gemini-free)
 - [Setup & Installation (Windows Native)](#setup--installation-windows-native)
 - [Setup & Installation (Docker & Docker Compose)](#setup--installation-docker--docker-compose)
 - [API Reference & cURL Examples](#api-reference--curl-examples)
 - [Evaluation Harness](#evaluation-harness)
+- [Storage Locations](#storage-locations)
 - [Troubleshooting & FAQ](#troubleshooting--faq)
 - [Future Improvements](#future-improvements)
 
@@ -33,14 +35,14 @@ Runs smoothly on standard 8GB RAM laptops (Windows/Linux/macOS) on CPU with zero
 
 ## Key Features
 
-- **Real RAG Pipeline**: No mock or hallucinated responses. Built with official LangChain split packages (`langchain-chroma`, `langchain-huggingface`, `langchain-openai`, `langchain-ollama`).
+- **Real RAG Pipeline**: No mock or hallucinated responses. Built with official LangChain split packages (`langchain-chroma`, `langchain-huggingface`, `langchain-google-genai`, `langchain-openai`, `langchain-ollama`).
 - **Zero-Hallucination Guardrail**: A strict cosine similarity threshold prevents hallucinations. If retrieved chunks do not exceed the relevance threshold, the system immediately returns:  
   `"I couldn't find enough information in the uploaded documents to answer this question."` without making an unnecessary LLM call.
 - **Accurate Source Citations**: Every generated answer specifies the source PDF filename, 1-indexed page number, relevance match score, and expandable text excerpt.
 - **Content Hash & Duplicate Prevention**: SHA-256 content hashing detects duplicate uploads instantly, preventing redundant embeddings and storage waste.
 - **Conversational Context Condensation**: Multi-turn conversation history is condensed by the LLM into a standalone query before vector retrieval.
 - **CPU-Friendly & 8GB RAM Certified**: Default embeddings use `sentence-transformers/all-MiniLM-L6-v2` (only ~80MB), running locally on CPU.
-- **Provider Agnostic**: Switch seamlessly between OpenAI (`gpt-4o-mini`) and local private Ollama (`llama3.2:3b`), or swap embeddings between HuggingFace and OpenAI with a single `.env` toggle.
+- **Provider Agnostic**: Switch seamlessly between OpenAI (`gpt-4o-mini`), Google Gemini (`gemini-2.5-flash`, free tier) and local private Ollama (`llama3.2:3b`), or swap embeddings between HuggingFace and OpenAI with a single `.env` toggle.
 - **Embedding Mismatch Protection**: Vector store embeds provider/model metadata signatures; mismatches trigger explicit warnings or safe resets.
 - **Modern Responsive UI**: Clean academic dark aesthetic with drag-and-drop PDF ingestion, real-time progress indicators, copy actions, and clickable sample questions.
 
@@ -71,10 +73,11 @@ Runs smoothly on standard 8GB RAM laptops (Windows/Linux/macOS) on CPU with zero
                       |                                  |
            Dense Embeddings                   Grounded Synthesis
                       v                                  v
-+---------------------+-------------+     +--------------+----------------+
++---------------------+-------------+     +-------------------------------+
 |          EMBEDDING LAYER          |     |           LLM LAYER           |
-|  - HuggingFace (MiniLM-L6-v2)     |     |  - OpenAI (gpt-4o-mini)       |
-|  - OpenAI (text-embedding-3-small)|     |  - Ollama (llama3.2:3b local) |
+|  - HuggingFace (MiniLM-L6-v2)     |     |  - Gemini (gemini-2.5-flash)  |
+|  - OpenAI (text-embedding-3-small)|     |  - OpenAI (gpt-4o-mini)       |
+|                                   |     |  - Ollama (llama3.2:3b local) |
 +---------------------+-------------+     +-------------------------------+
                       |
                       v
@@ -132,7 +135,7 @@ Runs smoothly on standard 8GB RAM laptops (Windows/Linux/macOS) on CPU with zero
      [Context Synthesis: [Document: X, Page: Y] + Content]
              |
              v
-     [Academic LLM Prompt (OpenAI / Ollama)]
+     [Academic LLM Prompt (Gemini / OpenAI / Ollama)]
              |
              v
      [Answer + Deduplicated Source Citations]
@@ -150,6 +153,7 @@ Runs smoothly on standard 8GB RAM laptops (Windows/Linux/macOS) on CPU with zero
   - `langchain`, `langchain-community`, `langchain-core`
   - `langchain-chroma`: Vector store integration
   - `langchain-huggingface`: Local CPU sentence transformers
+  - `langchain-google-genai`: Google Gemini integration
   - `langchain-openai`: OpenAI GPT & embedding integration
   - `langchain-ollama`: Local offline LLM execution
 - **PyPDF**: PDF parsing and text stream decoding
@@ -187,7 +191,7 @@ academic-rag-system/
 │   │   ├── rag/
 │   │   │   ├── cleaner.py          # PDF text normalizer & hyphenation fixer
 │   │   │   ├── embeddings.py       # Singleton embedding factory
-│   │   │   ├── generator.py        # LLM factory (OpenAI / Ollama)
+│   │   │   ├── generator.py        # LLM factory (Gemini / OpenAI / Ollama)
 │   │   │   ├── loader.py           # PyPDFLoader wrapper with validation
 │   │   │   ├── pipeline.py         # End-to-end RAG orchestrator
 │   │   │   ├── prompts.py          # Academic system prompt & condenser
@@ -203,6 +207,8 @@ academic-rag-system/
 │   │   └── main.py                 # FastAPI application & CORS setup
 │   ├── chroma_db/                  # Persistent Chroma storage directory
 │   ├── sample_documents/           # Sample academic PDFs (DBMS, Networks, Cloud)
+│   ├── tests/
+│   │   └── test_gemini.py          # Gemini provider unit tests
 │   ├── uploads/                    # Physical PDF storage directory
 │   ├── create_sample_academic_pdfs.py # Generator for multi-page study PDFs
 │   ├── evaluate.py                 # 5 benchmark evaluation questions
@@ -251,9 +257,11 @@ cp .env.example backend/.env
 
 | Variable | Default Value | Description |
 | :--- | :--- | :--- |
-| `LLM_PROVIDER` | `openai` | Active LLM provider: `openai` or `ollama` |
+| `LLM_PROVIDER` | `gemini` | Active LLM provider: `openai`, `gemini`, or `ollama` |
 | `OPENAI_API_KEY` | *(empty)* | OpenAI API key (sk-...) |
 | `OPENAI_MODEL` | `gpt-4o-mini` | OpenAI chat model name |
+| `GOOGLE_API_KEY` | *(empty)* | Google Gemini API key (never commit this value) |
+| `GEMINI_MODEL` | `gemini-2.5-flash` | Gemini chat model name |
 | `OLLAMA_MODEL` | `llama3.2:3b` | Ollama model name (e.g., `llama3.2:3b`, `mistral`) |
 | `OLLAMA_BASE_URL` | `http://localhost:11434` | Ollama server API URL |
 | `EMBEDDING_PROVIDER` | `huggingface` | Active embedding provider: `huggingface` or `openai` |
@@ -271,7 +279,19 @@ cp .env.example backend/.env
 
 The backend is built with factory patterns (`get_llm()` and `get_embedding_function()`), making provider switching completely seamless without modifying application code.
 
-### 1. OpenAI (Default Cloud Configuration)
+### 1. Gemini (Free Cloud)
+In `backend/.env`:
+```env
+LLM_PROVIDER=gemini
+GOOGLE_API_KEY=your_google_api_key_here
+GEMINI_MODEL=gemini-2.5-flash
+
+EMBEDDING_PROVIDER=huggingface
+HF_EMBEDDING_MODEL=sentence-transformers/all-MiniLM-L6-v2
+```
+*Benefits*: 100% free cloud LLM using Google's `gemini-2.5-flash` with strong reasoning and rapid generation. See the [Using Gemini (free)](#using-gemini-free) section below for key setup, configuration details, and rate limit tips.
+
+### 2. OpenAI (Cloud Configuration)
 In `backend/.env`:
 ```env
 LLM_PROVIDER=openai
@@ -283,7 +303,7 @@ HF_EMBEDDING_MODEL=sentence-transformers/all-MiniLM-L6-v2
 ```
 *Benefits*: Fast, high accuracy, highly cost-effective (`gpt-4o-mini`), with free local embeddings that keep costs minimal.
 
-### 2. 100% Offline / Local Private (Ollama)
+### 3. 100% Offline / Local Private (Ollama)
 In `backend/.env`:
 ```env
 LLM_PROVIDER=ollama
@@ -305,7 +325,7 @@ HF_EMBEDDING_MODEL=sentence-transformers/all-MiniLM-L6-v2
    ```
 *Benefits*: 100% free, 100% private, no API keys, zero external internet dependencies.
 
-### 3. Switching Embedding Providers & Vector Store Mismatch Protection
+### 4. Switching Embedding Providers & Vector Store Mismatch Protection
 ChromaDB collections store an embedding signature (`signature = provider::model`).
 - If you change `EMBEDDING_PROVIDER` (e.g. from `huggingface` to `openai`), the vector dimensions change (384 dims vs 1536 dims).
 - The system automatically detects this mismatch and raises an `EmbeddingMismatchException` rather than returning corrupt search results.
@@ -316,6 +336,28 @@ ChromaDB collections store an embedding signature (`signature = provider::model`
   # Re-ingest documents
   python backend/ingest_sample_docs.py
   ```
+
+---
+
+## Using Gemini (free)
+
+Gemini is the default LLM provider. Embeddings stay on HuggingFace so existing ChromaDB vectors remain valid (no re-indexing).
+
+1. Create a free API key at [Google AI Studio](https://aistudio.google.com/apikey) (aistudio.google.com).
+2. Put the key only in `backend/.env` (this file is gitignored):
+
+```env
+LLM_PROVIDER=gemini
+GOOGLE_API_KEY=your_google_api_key_here
+GEMINI_MODEL=gemini-2.5-flash
+
+EMBEDDING_PROVIDER=huggingface
+HF_EMBEDDING_MODEL=sentence-transformers/all-MiniLM-L6-v2
+```
+
+3. Restart the backend. `GET /api/health` should report `llm_provider: gemini` and `llm_model: gemini-2.5-flash` (the key is never returned).
+
+**429 troubleshooting**: The Gemini free tier is rate-limited. If you see `"Gemini free-tier rate limit reached. Please wait a minute and try again."`, wait about a minute and retry. Do not paste your API key into chat, logs, or the frontend.
 
 ---
 
@@ -357,7 +399,7 @@ pip install -r requirements.txt
 # Copy environment file
 Copy-Item .env.example .env
 
-# (Optional) Open .env in Notepad to insert your OPENAI_API_KEY if using OpenAI
+# (Optional) Open .env in Notepad to insert GOOGLE_API_KEY (Gemini) or OPENAI_API_KEY (OpenAI)
 notepad .env
 
 # Generate sample academic PDFs (DBMS, Computer Networks, Cloud Computing)
@@ -410,7 +452,7 @@ Docker packages the full frontend, backend, and ChromaDB persistence in isolated
 From the project root:
 
 ```bash
-# 1. Ensure .env is populated in backend/
+# 1. Ensure .env is populated in backend/ (all settings including LLM_PROVIDER, GOOGLE_API_KEY, GEMINI_MODEL, and OPENAI_API_KEY reach the backend container via env_file)
 cp .env.example backend/.env
 
 # 2. Build and launch all containers
@@ -438,8 +480,8 @@ curl -X GET http://127.0.0.1:8000/api/health
 ```json
 {
   "status": "ok",
-  "llm_provider": "openai",
-  "llm_model": "gpt-4o-mini",
+  "llm_provider": "gemini",
+  "llm_model": "gemini-2.5-flash",
   "embedding_provider": "huggingface",
   "embedding_model": "sentence-transformers/all-MiniLM-L6-v2",
   "document_count": 3,
@@ -604,12 +646,33 @@ python evaluate.py
   ```env
   OPENAI_API_KEY=sk-proj-...
   ```
+  Or switch to Gemini:
+  ```env
+  LLM_PROVIDER=gemini
+  GOOGLE_API_KEY=your_google_api_key_here
+  ```
   Or switch to Ollama:
   ```env
   LLM_PROVIDER=ollama
   ```
 
-### 2. `OllamaNotRunningException: 503 Ollama is not running`
+### 2. `MissingAPIKeyException: 401 Missing Google Gemini API key`
+- **Cause**: `LLM_PROVIDER=gemini` is selected, but `GOOGLE_API_KEY` is blank or invalid.
+- **Solution**: Create a key at [Google AI Studio](https://aistudio.google.com/apikey) and set `GOOGLE_API_KEY` in `backend/.env`:
+  ```env
+  LLM_PROVIDER=gemini
+  GOOGLE_API_KEY=your_google_api_key_here
+  ```
+  Or switch to Ollama:
+  ```env
+  LLM_PROVIDER=ollama
+  ```
+
+### 3. `GeminiRateLimitException: 429 Gemini free-tier rate limit reached`
+- **Cause**: The Gemini free-tier quota was exceeded (too many requests in a short window).
+- **Solution**: Wait about a minute and try the question again.
+
+### 4. `OllamaNotRunningException: 503 Ollama is not running`
 - **Cause**: `LLM_PROVIDER=ollama` is selected, but the Ollama daemon is not started.
 - **Solution**: Start Ollama in your terminal:
   ```bash
@@ -617,15 +680,15 @@ python evaluate.py
   ollama pull llama3.2:3b
   ```
 
-### 3. `ScannedPDFException: 422 Scanned PDF or non-extractable text`
+### 5. `ScannedPDFException: 422 Scanned PDF or non-extractable text`
 - **Cause**: The uploaded PDF consists of scanned raster images or photos without an embedded digital text layer.
 - **Solution**: Upload PDFs generated with digital text (e.g., exported from Word, LaTeX, Google Docs, or converted with OCR).
 
-### 4. `DuplicateDocumentException: 409 Duplicate document detected`
+### 6. `DuplicateDocumentException: 409 Duplicate document detected`
 - **Cause**: The PDF content has the exact same SHA-256 hash as an already indexed file.
 - **Solution**: The file is already indexed. You can query it directly in the chat or delete the existing document first.
 
-### 5. `EmbeddingMismatchException: 409 Embedding configuration mismatch`
+### 7. `EmbeddingMismatchException: 409 Embedding configuration mismatch`
 - **Cause**: You changed `EMBEDDING_PROVIDER` or `HF_EMBEDDING_MODEL` after already creating vectors with another model.
 - **Solution**: Delete `backend/chroma_db/` and re-ingest documents so vectors match the new dimensionality.
 

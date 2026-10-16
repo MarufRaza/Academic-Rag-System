@@ -4,7 +4,7 @@ from pydantic import BaseModel, Field
 
 class HealthResponse(BaseModel):
     status: str = Field(default="ok", description="Overall health status")
-    llm_provider: str = Field(..., description="Active LLM provider (openai/ollama)")
+    llm_provider: str = Field(..., description="Active LLM provider (openai/gemini/ollama)")
     llm_model: str = Field(..., description="Active LLM model name")
     embedding_provider: str = Field(..., description="Active embedding provider (huggingface/openai)")
     embedding_model: str = Field(..., description="Active embedding model name")

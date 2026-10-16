@@ -8,9 +8,12 @@ class Settings(BaseSettings):
     API_V1_STR: str = "/api"
 
     # LLM Provider Configuration
-    LLM_PROVIDER: str = "openai"  # "openai" or "ollama"
+    LLM_PROVIDER: str = "gemini"  # "openai", "gemini", or "ollama"
     OPENAI_API_KEY: Optional[str] = None
     OPENAI_MODEL: str = "gpt-4o-mini"
+
+    GOOGLE_API_KEY: Optional[str] = None
+    GEMINI_MODEL: str = "gemini-2.5-flash"
 
     OLLAMA_MODEL: str = "llama3.2:3b"
     OLLAMA_BASE_URL: str = "http://localhost:11434"

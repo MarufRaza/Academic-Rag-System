@@ -3,7 +3,7 @@ from app.core.config import settings
 from app.core.exceptions import EmptyQuestionException
 from app.core.logging import logger
 from app.models.chat import ChatMessage, ChatResponse, SourceCitation
-from app.rag.generator import get_llm, invoke_llm_safely
+from app.rag.generator import get_llm, invoke_llm_safely, translate_llm_exception
 from app.rag.prompts import ACADEMIC_RAG_PROMPT, CONDENSE_QUESTION_PROMPT
 from app.rag.retriever import retrieve_relevant_chunks
 
@@ -183,7 +183,6 @@ def stream_rag_pipeline(
         return
 
     context_text = format_retrieved_context(relevant_chunks)
-    llm = get_llm(temperature=0.1)
     prompt_text = ACADEMIC_RAG_PROMPT.format(
         context=context_text,
         question=standalone_q
@@ -207,14 +206,17 @@ def stream_rag_pipeline(
             })
 
     try:
+        llm = get_llm(temperature=0.1)
         # Stream response tokens
         for chunk in llm.stream(prompt_text):
             token_text = chunk.content if hasattr(chunk, "content") else str(chunk)
             if token_text:
                 yield f"data: {json.dumps({'type': 'token', 'content': token_text})}\n\n"
     except Exception as e:
-        logger.error(f"Streaming LLM error: {e}")
-        yield f"data: {json.dumps({'type': 'error', 'message': str(e)})}\n\n"
+        rag_err = translate_llm_exception(e)
+        logger.error(f"Streaming LLM error: {rag_err.detail}")
+        yield f"data: {json.dumps({'type': 'error', 'message': rag_err.detail})}\n\n"
+        return
 
     # Send sources and completion signal
     yield f"data: {json.dumps({'type': 'sources', 'sources': sources})}\n\n"

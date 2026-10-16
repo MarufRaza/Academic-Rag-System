@@ -48,9 +48,20 @@ class FileTooLargeException(AcademicRAGException):
 
 class MissingAPIKeyException(AcademicRAGException):
     def __init__(self, provider: str = "OpenAI"):
+        provider_lower = provider.lower()
+        if "gemini" in provider_lower or "google" in provider_lower:
+            if "invalid" in provider_lower:
+                detail = "Invalid Google Gemini API key. Please check GOOGLE_API_KEY in the backend .env file."
+            else:
+                detail = "Missing Google Gemini API key. Please configure GOOGLE_API_KEY in the backend .env file."
+        else:
+            detail = (
+                f"Missing {provider} API key. Please configure OPENAI_API_KEY in the backend .env file "
+                f"or switch LLM_PROVIDER to ollama."
+            )
         super().__init__(
             status_code=status.HTTP_401_UNAUTHORIZED,
-            detail=f"Missing {provider} API key. Please configure OPENAI_API_KEY in the backend .env file or switch LLM_PROVIDER to ollama."
+            detail=detail
         )
 
 
@@ -59,6 +70,14 @@ class ProviderException(AcademicRAGException):
         super().__init__(
             status_code=status.HTTP_502_BAD_GATEWAY,
             detail=f"{provider} service error: {error_detail}"
+        )
+
+
+class GeminiRateLimitException(AcademicRAGException):
+    def __init__(self):
+        super().__init__(
+            status_code=status.HTTP_429_TOO_MANY_REQUESTS,
+            detail="Gemini free-tier rate limit reached. Please wait a minute and try again."
         )
 
 

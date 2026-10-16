@@ -15,11 +15,13 @@ async def health_check():
     docs = list_all_documents()
     chunks_count = get_total_chunks_count()
 
-    llm_model = (
-        settings.OPENAI_MODEL
-        if settings.LLM_PROVIDER.lower() == "openai"
-        else settings.OLLAMA_MODEL
-    )
+    provider = settings.LLM_PROVIDER.lower()
+    if provider == "openai":
+        llm_model = settings.OPENAI_MODEL
+    elif provider == "gemini":
+        llm_model = settings.GEMINI_MODEL
+    else:
+        llm_model = settings.OLLAMA_MODEL
 
     return HealthResponse(
         status="ok",
