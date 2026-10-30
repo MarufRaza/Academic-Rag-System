@@ -1,0 +1,201 @@
+doc_id,doc_type,source,chunk_id,chunk_text,embedding_model,retrieval_score,query,answer
+0f2c445f10a86caf,pdf,DBMS_Study_Notes.pdf,2,"Chapter 2: Database Normalization and Normal Forms
+Understanding Normalization (1NF, 2NF, 3NF, BCNF)
+Normalization is a systematic approach of decomposing tables to eliminate data redundancy and undesirable
+anomalies such as Insertion, Update, and Deletion anomalies. It organizes relational database fields and tables
+according to functional dependencies.
+First Normal Form (1NF) mandates that table columns contain only atomic (indivisible) values and each row
+contains unique values with no repeating groups. Second Normal Form (2NF) requires that the table is in 1NF
+and all non-key attributes are fully functionally dependent on the entire primary key, eliminating partial
+dependencies. Third Normal Form (3NF) requires 2NF compliance and ensures that no non-prime attribute is",huggingface::sentence-transformers/all-MiniLM-L6-v2,0.783462,What is database normalization and what are the benefits of 3NF?,"Chapter 2: Database Normalization and Normal Forms
+Understanding Normalization (1NF, 2NF, 3NF, BCNF)
+Normalization is a systematic approach of decomposing tables to eliminate data redundancy and undesirable
+anomalies such as Insertion, Update, and Deletion anomalies. It organizes relational database fields and tables
+according to functional dependencies.
+First Normal Form (1NF) mandates that table columns contain only atomic (indivisible) values and each row
+contains unique values with no repeating groups. Second Normal Form (2NF) requires that the table is in 1NF
+and all non-key attributes are fully functionally dependent on the entire primary key, eliminating partial
+dependencies. Third Normal Form (3NF) requires 2NF compliance and ensures that no non-prime attribute is"
+0f2c445f10a86caf,pdf,DBMS_Study_Notes.pdf,3,"dependencies. Third Normal Form (3NF) requires 2NF compliance and ensures that no non-prime attribute is
+transitively dependent on the primary key (X -> Y and Y -> Z where Z is non-prime). The benefits of 3NF include
+minimal storage redundancy, simplified data consistency, and prevention of anomalous modifications.
+Boyce-Codd Normal Form (BCNF) is a stricter version of 3NF where for every functional dependency X -> Y, X
+must be a super key.",huggingface::sentence-transformers/all-MiniLM-L6-v2,0.662792,What is database normalization and what are the benefits of 3NF?,"dependencies. Third Normal Form (3NF) requires 2NF compliance and ensures that no non-prime attribute is
+transitively dependent on the primary key (X -> Y and Y -> Z where Z is non-prime). The benefits of 3NF include
+minimal storage redundancy, simplified data consistency, and prevention of anomalous modifications.
+Boyce-Codd Normal Form (BCNF) is a stricter version of 3NF where for every functional dependency X -> Y, X
+must be a super key."
+0f2c445f10a86caf,pdf,DBMS_Study_Notes.pdf,0,"Database Management Systems: Foundations &
+Relational Model
+Chapter 1: Relational Data Model and Key Constraints
+A relational database organizes data into one or more tables (or relations) consisting of rows (tuples) and
+columns (attributes). Each table has a designated primary key that uniquely identifies each tuple within that
+table. A candidate key is a minimal superkey that can uniquely distinguish records. A primary key is chosen
+from candidate keys. Foreign keys establish referential integrity between tables, ensuring that values in the
+child table reference valid primary key tuples in the parent table.
+Relational algebra forms the theoretical foundation of relational queries, comprising fundamental operations",huggingface::sentence-transformers/all-MiniLM-L6-v2,0.461021,What is database normalization and what are the benefits of 3NF?,"Database Management Systems: Foundations &
+Relational Model
+Chapter 1: Relational Data Model and Key Constraints
+A relational database organizes data into one or more tables (or relations) consisting of rows (tuples) and
+columns (attributes). Each table has a designated primary key that uniquely identifies each tuple within that
+table. A candidate key is a minimal superkey that can uniquely distinguish records. A primary key is chosen
+from candidate keys. Foreign keys establish referential integrity between tables, ensuring that values in the
+child table reference valid primary key tuples in the parent table.
+Relational algebra forms the theoretical foundation of relational queries, comprising fundamental operations"
+0f2c445f10a86caf,pdf,DBMS_Study_Notes.pdf,4,"Chapter 3: Transaction Management & ACID Properties
+ACID Guarantees and Concurrency Control
+A transaction is a logical unit of database processing that includes one or more database access operations. To
+preserve database integrity, transactions must satisfy the four ACID properties: Atomicity (all or nothing
+execution), Consistency (database transitions from one valid state to another), Isolation (concurrent
+transactions execute independently without interference), and Durability (committed changes persist
+permanently even after hardware crashes).
+Concurrency control techniques like Two-Phase Locking (2PL) and Timestamp Ordering ensure serializability
+and prevent dirty reads, unrepeatable reads, and phantom reads.",huggingface::sentence-transformers/all-MiniLM-L6-v2,0.427269,What is database normalization and what are the benefits of 3NF?,"Chapter 3: Transaction Management & ACID Properties
+ACID Guarantees and Concurrency Control
+A transaction is a logical unit of database processing that includes one or more database access operations. To
+preserve database integrity, transactions must satisfy the four ACID properties: Atomicity (all or nothing
+execution), Consistency (database transitions from one valid state to another), Isolation (concurrent
+transactions execute independently without interference), and Durability (committed changes persist
+permanently even after hardware crashes).
+Concurrency control techniques like Two-Phase Locking (2PL) and Timestamp Ordering ensure serializability
+and prevent dirty reads, unrepeatable reads, and phantom reads."
+5bd5774f75e73a0f,pdf,Computer_Networks_Guide.pdf,1,"Chapter 2: The OSI 7-Layer Reference Model
+Detailed Architecture of the OSI Model
+The Open Systems Interconnection (OSI) reference model is a conceptual framework standardized by ISO that
+partitions network communication into seven hierarchical layers: 1. Physical Layer (Layer 1): Transmits raw
+unstructured bit streams over physical transmission media (cables, optical fibers, radio frequencies). 2. Data
+Link Layer (Layer 2): Ensures node-to-node frame delivery, physical MAC addressing, framing, and error
+detection (Ethernet, Wi-Fi). 3. Network Layer (Layer 3): Responsible for logical addressing (IP addresses),
+packet routing across multi-hop networks, and fragmentation. 4. Transport Layer (Layer 4): Provides end-to-end",huggingface::sentence-transformers/all-MiniLM-L6-v2,0.683037,Explain the 7 layers of the OSI model and their key responsibilities.,"Chapter 2: The OSI 7-Layer Reference Model
+Detailed Architecture of the OSI Model
+The Open Systems Interconnection (OSI) reference model is a conceptual framework standardized by ISO that
+partitions network communication into seven hierarchical layers: 1. Physical Layer (Layer 1): Transmits raw
+unstructured bit streams over physical transmission media (cables, optical fibers, radio frequencies). 2. Data
+Link Layer (Layer 2): Ensures node-to-node frame delivery, physical MAC addressing, framing, and error
+detection (Ethernet, Wi-Fi). 3. Network Layer (Layer 3): Responsible for logical addressing (IP addresses),
+packet routing across multi-hop networks, and fragmentation. 4. Transport Layer (Layer 4): Provides end-to-end"
+5bd5774f75e73a0f,pdf,Computer_Networks_Guide.pdf,2,"packet routing across multi-hop networks, and fragmentation. 4. Transport Layer (Layer 4): Provides end-to-end
+process-to-process message transfer, port addressing, flow control, and reliability (TCP/UDP). 5. Session Layer
+(Layer 5): Establishes, manages, synchronizes, and terminates communication sessions between cooperating
+applications. 6. Presentation Layer (Layer 6): Translates, encrypts, and compresses data formats between the
+network and application (e.g., TLS, ASCII, JPEG). 7. Application Layer (Layer 7): Provides network interfaces
+and protocols directly to end-user software applications (HTTP, DNS, SMTP, FTP).",huggingface::sentence-transformers/all-MiniLM-L6-v2,0.483703,Explain the 7 layers of the OSI model and their key responsibilities.,"packet routing across multi-hop networks, and fragmentation. 4. Transport Layer (Layer 4): Provides end-to-end
+process-to-process message transfer, port addressing, flow control, and reliability (TCP/UDP). 5. Session Layer
+(Layer 5): Establishes, manages, synchronizes, and terminates communication sessions between cooperating
+applications. 6. Presentation Layer (Layer 6): Translates, encrypts, and compresses data formats between the
+network and application (e.g., TLS, ASCII, JPEG). 7. Application Layer (Layer 7): Provides network interfaces
+and protocols directly to end-user software applications (HTTP, DNS, SMTP, FTP)."
+72ac95132b7baed9,pdf,Cloud_Computing_Essentials.pdf,2,"Chapter 2: Cloud Service Models (SPI Model)
+Comparing IaaS, PaaS, and SaaS
+Cloud services are categorized into three primary layers of abstraction: 1. Infrastructure as a Service (IaaS):
+Provides fundamental computing resources including virtual machines, storage, and software-defined networks.
+The customer manages the operating system, middleware, and applications (e.g., AWS EC2, Google Compute
+Engine, Azure VMs). 2. Platform as a Service (PaaS): Provides hardware and application development
+software platforms hosted by the cloud provider. Developers can focus on code deployment without managing
+underlying infrastructure (e.g., AWS Elastic Beanstalk, Heroku, Google App Engine). 3. Software as a Service",huggingface::sentence-transformers/all-MiniLM-L6-v2,0.397232,Explain the 7 layers of the OSI model and their key responsibilities.,"Chapter 2: Cloud Service Models (SPI Model)
+Comparing IaaS, PaaS, and SaaS
+Cloud services are categorized into three primary layers of abstraction: 1. Infrastructure as a Service (IaaS):
+Provides fundamental computing resources including virtual machines, storage, and software-defined networks.
+The customer manages the operating system, middleware, and applications (e.g., AWS EC2, Google Compute
+Engine, Azure VMs). 2. Platform as a Service (PaaS): Provides hardware and application development
+software platforms hosted by the cloud provider. Developers can focus on code deployment without managing
+underlying infrastructure (e.g., AWS Elastic Beanstalk, Heroku, Google App Engine). 3. Software as a Service"
+5bd5774f75e73a0f,pdf,Computer_Networks_Guide.pdf,0,"Computer Networks & Communications: Architecture
+Chapter 1: Network Fundamentals and Topologies
+Computer networks interconnect autonomous computational devices for resource sharing and communication.
+Topologies describe how nodes are organized physically and logically: Star (central hub/switch), Bus (shared
+backbone cable), Ring (token circulation), Mesh (redundant point-to-point connections), and Hybrid. Packet
+switching divides data into discrete packets routed independently across routers using store-and-forward
+mechanisms.",huggingface::sentence-transformers/all-MiniLM-L6-v2,0.347336,Explain the 7 layers of the OSI model and their key responsibilities.,"Computer Networks & Communications: Architecture
+Chapter 1: Network Fundamentals and Topologies
+Computer networks interconnect autonomous computational devices for resource sharing and communication.
+Topologies describe how nodes are organized physically and logically: Star (central hub/switch), Bus (shared
+backbone cable), Ring (token circulation), Mesh (redundant point-to-point connections), and Hybrid. Packet
+switching divides data into discrete packets routed independently across routers using store-and-forward
+mechanisms."
+5bd5774f75e73a0f,pdf,Computer_Networks_Guide.pdf,4,"acknowledgment or automatic retransmission. - Ordering: TCP guarantees in-order packet delivery using
+sequence numbers. UDP packets may arrive out of order. - Overhead and Speed: TCP has a larger 20-byte
+header, congestion control, and flow control mechanisms, making it slower with higher overhead. UDP has a
+lightweight 8-byte header and low latency. - Use Cases: TCP is used where data accuracy is critical
+(HTTP/HTTPS, File Transfer FTP, SSH, email). UDP is used for real-time applications where low latency
+outweighs packet loss (VoIP, video streaming, DNS queries, online multiplayer games).",huggingface::sentence-transformers/all-MiniLM-L6-v2,0.792399,What is the key difference between TCP and UDP in terms of reliability and overhead?,"acknowledgment or automatic retransmission. - Ordering: TCP guarantees in-order packet delivery using
+sequence numbers. UDP packets may arrive out of order. - Overhead and Speed: TCP has a larger 20-byte
+header, congestion control, and flow control mechanisms, making it slower with higher overhead. UDP has a
+lightweight 8-byte header and low latency. - Use Cases: TCP is used where data accuracy is critical
+(HTTP/HTTPS, File Transfer FTP, SSH, email). UDP is used for real-time applications where low latency
+outweighs packet loss (VoIP, video streaming, DNS queries, online multiplayer games)."
+5bd5774f75e73a0f,pdf,Computer_Networks_Guide.pdf,3,"Chapter 3: Transport Layer Protocols: TCP vs UDP
+Detailed Comparison Between TCP and UDP
+The Transmission Control Protocol (TCP) and User Datagram Protocol (UDP) are the two core protocols of the
+Transport Layer. Differences between TCP and UDP: - Connection State: TCP is connection-oriented, requiring
+a 3-way handshake (SYN, SYN-ACK, ACK) prior to data transfer. UDP is connectionless and sends datagrams
+without establishing a handshake. - Reliability: TCP guarantees delivery through sequence numbers,
+acknowledgments (ACK), and retransmissions of lost packets. UDP provides best-effort delivery with no
+acknowledgment or automatic retransmission. - Ordering: TCP guarantees in-order packet delivery using",huggingface::sentence-transformers/all-MiniLM-L6-v2,0.769974,What is the key difference between TCP and UDP in terms of reliability and overhead?,"Chapter 3: Transport Layer Protocols: TCP vs UDP
+Detailed Comparison Between TCP and UDP
+The Transmission Control Protocol (TCP) and User Datagram Protocol (UDP) are the two core protocols of the
+Transport Layer. Differences between TCP and UDP: - Connection State: TCP is connection-oriented, requiring
+a 3-way handshake (SYN, SYN-ACK, ACK) prior to data transfer. UDP is connectionless and sends datagrams
+without establishing a handshake. - Reliability: TCP guarantees delivery through sequence numbers,
+acknowledgments (ACK), and retransmissions of lost packets. UDP provides best-effort delivery with no
+acknowledgment or automatic retransmission. - Ordering: TCP guarantees in-order packet delivery using"
+5bd5774f75e73a0f,pdf,Computer_Networks_Guide.pdf,2,"packet routing across multi-hop networks, and fragmentation. 4. Transport Layer (Layer 4): Provides end-to-end
+process-to-process message transfer, port addressing, flow control, and reliability (TCP/UDP). 5. Session Layer
+(Layer 5): Establishes, manages, synchronizes, and terminates communication sessions between cooperating
+applications. 6. Presentation Layer (Layer 6): Translates, encrypts, and compresses data formats between the
+network and application (e.g., TLS, ASCII, JPEG). 7. Application Layer (Layer 7): Provides network interfaces
+and protocols directly to end-user software applications (HTTP, DNS, SMTP, FTP).",huggingface::sentence-transformers/all-MiniLM-L6-v2,0.415402,What is the key difference between TCP and UDP in terms of reliability and overhead?,"packet routing across multi-hop networks, and fragmentation. 4. Transport Layer (Layer 4): Provides end-to-end
+process-to-process message transfer, port addressing, flow control, and reliability (TCP/UDP). 5. Session Layer
+(Layer 5): Establishes, manages, synchronizes, and terminates communication sessions between cooperating
+applications. 6. Presentation Layer (Layer 6): Translates, encrypts, and compresses data formats between the
+network and application (e.g., TLS, ASCII, JPEG). 7. Application Layer (Layer 7): Provides network interfaces
+and protocols directly to end-user software applications (HTTP, DNS, SMTP, FTP)."
+72ac95132b7baed9,pdf,Cloud_Computing_Essentials.pdf,2,"Chapter 2: Cloud Service Models (SPI Model)
+Comparing IaaS, PaaS, and SaaS
+Cloud services are categorized into three primary layers of abstraction: 1. Infrastructure as a Service (IaaS):
+Provides fundamental computing resources including virtual machines, storage, and software-defined networks.
+The customer manages the operating system, middleware, and applications (e.g., AWS EC2, Google Compute
+Engine, Azure VMs). 2. Platform as a Service (PaaS): Provides hardware and application development
+software platforms hosted by the cloud provider. Developers can focus on code deployment without managing
+underlying infrastructure (e.g., AWS Elastic Beanstalk, Heroku, Google App Engine). 3. Software as a Service",huggingface::sentence-transformers/all-MiniLM-L6-v2,0.811049,"Explain the core service models of cloud computing: IaaS, PaaS, and SaaS.","Chapter 2: Cloud Service Models (SPI Model)
+Comparing IaaS, PaaS, and SaaS
+Cloud services are categorized into three primary layers of abstraction: 1. Infrastructure as a Service (IaaS):
+Provides fundamental computing resources including virtual machines, storage, and software-defined networks.
+The customer manages the operating system, middleware, and applications (e.g., AWS EC2, Google Compute
+Engine, Azure VMs). 2. Platform as a Service (PaaS): Provides hardware and application development
+software platforms hosted by the cloud provider. Developers can focus on code deployment without managing
+underlying infrastructure (e.g., AWS Elastic Beanstalk, Heroku, Google App Engine). 3. Software as a Service"
+72ac95132b7baed9,pdf,Cloud_Computing_Essentials.pdf,0,"Cloud Computing: Architecture & Principles
+Chapter 1: Definition and Advantages of Cloud Computing
+Cloud computing is the on-demand delivery of IT resources (compute power, storage, databases, networking)
+via the Internet with pay-as-you-go pricing. According to NIST, essential cloud characteristics include
+on-demand self-service, broad network access, resource pooling, rapid elasticity, and measured service.
+Key advantages of cloud computing include: - Cost Efficiency: Eliminates large capital expenditures (CapEx) for
+physical datacenters and hardware in favor of operational expenses (OpEx). - Elastic Scalability: Resources
+can dynamically scale up or down instantaneously in response to traffic spikes. - High Availability & Reliability:",huggingface::sentence-transformers/all-MiniLM-L6-v2,0.596385,"Explain the core service models of cloud computing: IaaS, PaaS, and SaaS.","Cloud Computing: Architecture & Principles
+Chapter 1: Definition and Advantages of Cloud Computing
+Cloud computing is the on-demand delivery of IT resources (compute power, storage, databases, networking)
+via the Internet with pay-as-you-go pricing. According to NIST, essential cloud characteristics include
+on-demand self-service, broad network access, resource pooling, rapid elasticity, and measured service.
+Key advantages of cloud computing include: - Cost Efficiency: Eliminates large capital expenditures (CapEx) for
+physical datacenters and hardware in favor of operational expenses (OpEx). - Elastic Scalability: Resources
+can dynamically scale up or down instantaneously in response to traffic spikes. - High Availability & Reliability:"
+72ac95132b7baed9,pdf,Cloud_Computing_Essentials.pdf,3,"underlying infrastructure (e.g., AWS Elastic Beanstalk, Heroku, Google App Engine). 3. Software as a Service
+(SaaS): Delivers complete, ready-to-use software applications accessed over web browsers. The vendor
+handles all maintenance, infrastructure, and runtime (e.g., Google Workspace, Microsoft 365, Salesforce).",huggingface::sentence-transformers/all-MiniLM-L6-v2,0.568007,"Explain the core service models of cloud computing: IaaS, PaaS, and SaaS.","underlying infrastructure (e.g., AWS Elastic Beanstalk, Heroku, Google App Engine). 3. Software as a Service
+(SaaS): Delivers complete, ready-to-use software applications accessed over web browsers. The vendor
+handles all maintenance, infrastructure, and runtime (e.g., Google Workspace, Microsoft 365, Salesforce)."
+5bd5774f75e73a0f,pdf,Computer_Networks_Guide.pdf,0,"Computer Networks & Communications: Architecture
+Chapter 1: Network Fundamentals and Topologies
+Computer networks interconnect autonomous computational devices for resource sharing and communication.
+Topologies describe how nodes are organized physically and logically: Star (central hub/switch), Bus (shared
+backbone cable), Ring (token circulation), Mesh (redundant point-to-point connections), and Hybrid. Packet
+switching divides data into discrete packets routed independently across routers using store-and-forward
+mechanisms.",huggingface::sentence-transformers/all-MiniLM-L6-v2,0.34774,"Explain the core service models of cloud computing: IaaS, PaaS, and SaaS.","Computer Networks & Communications: Architecture
+Chapter 1: Network Fundamentals and Topologies
+Computer networks interconnect autonomous computational devices for resource sharing and communication.
+Topologies describe how nodes are organized physically and logically: Star (central hub/switch), Bus (shared
+backbone cable), Ring (token circulation), Mesh (redundant point-to-point connections), and Hybrid. Packet
+switching divides data into discrete packets routed independently across routers using store-and-forward
+mechanisms."
+no-relevant-document,control,none,-1,No sample document chunk met the configured relevance threshold.,huggingface::sentence-transformers/all-MiniLM-L6-v2,0.0,What is the difference between preemptive and non-preemptive CPU scheduling algorithms?,I couldn't find enough information in the uploaded documents to answer this question.

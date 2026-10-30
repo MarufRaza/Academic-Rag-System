@@ -1,156 +1,173 @@
-import time
-from typing import List, Dict, Any
-from app.core.config import settings
-from app.rag.pipeline import execute_rag_pipeline, NOT_ENOUGH_INFO_MSG
-from app.rag.retriever import retrieve_relevant_chunks
-from app.rag.vectorstore import get_total_chunks_count
-from app.utils.manifest import list_all_documents
+"""Evaluate dataset queries through the end-to-end RAG answer pipeline."""
 
-# 5 representative academic evaluation questions
-# Includes positive tests (grounded domain queries) AND negative control (refusal guardrail test)
-SAMPLE_QUESTIONS = [
-    {
-        "id": "Q1",
-        "question": "What is database normalization and what are the benefits of 3NF?",
-        "topic": "Database Management Systems (DBMS)",
-        "expected_relevant": True,
-        "target_doc": "DBMS_Study_Notes.pdf",
-        "target_page": 2,
-    },
-    {
-        "id": "Q2",
-        "question": "Explain the 7 layers of the OSI model and their key responsibilities.",
-        "topic": "Computer Networks",
-        "expected_relevant": True,
-        "target_doc": "Computer_Networks_Guide.pdf",
-        "target_page": 2,
-    },
-    {
-        "id": "Q3",
-        "question": "What is the key difference between TCP and UDP in terms of reliability and overhead?",
-        "topic": "Computer Networks / Transport Layer",
-        "expected_relevant": True,
-        "target_doc": "Computer_Networks_Guide.pdf",
-        "target_page": 3,
-    },
-    {
-        "id": "Q4",
-        "question": "Explain the core service models of cloud computing: IaaS, PaaS, and SaaS.",
-        "topic": "Cloud Computing",
-        "expected_relevant": True,
-        "target_doc": "Cloud_Computing_Essentials.pdf",
-        "target_page": 2,
-    },
-    {
-        "id": "Q5",
-        "question": "What is the difference between preemptive and non-preemptive CPU scheduling algorithms?",
-        "topic": "Operating Systems (Negative Control / Refusal Test)",
-        "expected_relevant": False,  # Topic is not present in uploaded docs, MUST be rejected
-        "target_doc": None,
-        "target_page": None,
+import csv
+import re
+import shutil
+import statistics
+import time
+from datetime import datetime, timezone
+from pathlib import Path
+from typing import Dict, List
+
+from app.core.config import settings
+from app.rag.pipeline import NOT_ENOUGH_INFO_MSG, execute_rag_pipeline
+
+REPOSITORY_ROOT = Path(__file__).resolve().parents[1]
+DATASET_PATH = REPOSITORY_ROOT / "dataset.csv"
+RESULTS_DIR = REPOSITORY_ROOT / "evaluation_results"
+LATENCY_THRESHOLD_MS = 10_000.0
+ANSWER_QUALITY_THRESHOLD = 0.20
+
+
+def _load_dataset() -> List[Dict[str, str]]:
+    if not DATASET_PATH.is_file():
+        raise FileNotFoundError(
+            f"Dataset not found at {DATASET_PATH}. Run scripts/build_dataset.py first."
+        )
+    with DATASET_PATH.open("r", encoding="utf-8-sig", newline="") as dataset_file:
+        rows = list(csv.DictReader(dataset_file))
+    if not rows:
+        raise ValueError(f"No evaluation queries found in {DATASET_PATH}.")
+    if not {"source", "query", "answer"}.issubset(rows[0]):
+        raise ValueError("dataset.csv must include source, query, and answer columns.")
+    return rows
+
+
+def _answer_quality_score(answer: str, reference: str) -> float:
+    """Return reference-token recall as a lightweight answer-content heuristic."""
+    reference_tokens = {
+        token.lower()
+        for token in re.findall(r"\b[\w'-]+\b", reference)
+        if len(token) > 2
     }
-]
+    if reference.strip() == NOT_ENOUGH_INFO_MSG:
+        return 1.0 if answer.strip() == NOT_ENOUGH_INFO_MSG else 0.0
+    if not reference_tokens:
+        return 0.0
+    answer_tokens = {
+        token.lower()
+        for token in re.findall(r"\b[\w'-]+\b", answer)
+        if len(token) > 2
+    }
+    return len(reference_tokens & answer_tokens) / len(reference_tokens)
 
 
 def run_evaluation() -> None:
-    print("=" * 80)
-    print(" ACADEMIC RAG BENCHMARK & RETRIEVAL EVALUATION HARNESS")
-    print("=" * 80)
-    print(f"Embedding Provider : {settings.EMBEDDING_PROVIDER}")
-    print(f"Embedding Model    : {settings.HF_EMBEDDING_MODEL if settings.EMBEDDING_PROVIDER == 'huggingface' else settings.OPENAI_EMBEDDING_MODEL}")
-    print(f"LLM Provider       : {settings.LLM_PROVIDER}")
-    print(f"Top-K Chunks       : {settings.TOP_K}")
-    print(f"Score Threshold    : {settings.SCORE_THRESHOLD}")
-    print("-" * 80)
+    evaluated_at = datetime.now(timezone.utc).isoformat(timespec="seconds")
+    run_id = datetime.now(timezone.utc).strftime("%Y%m%d_%H%M%S")
+    dataset_rows = _load_dataset()
+    results: List[Dict[str, object]] = []
 
-    docs = list_all_documents()
-    total_chunks = get_total_chunks_count()
+    query_groups: Dict[str, List[Dict[str, str]]] = {}
+    for row in dataset_rows:
+        query_groups.setdefault(row["query"].strip(), []).append(row)
 
-    print(f"Indexed Documents  : {len(docs)}")
-    print(f"Total Vector Chunks: {total_chunks}")
-    print("-" * 80)
+    warmup_query = next(iter(query_groups))
+    execute_rag_pipeline(question=warmup_query)
 
-    if total_chunks == 0:
-        print("[!] No documents currently in ChromaDB.")
-        print("    Upload academic PDFs (e.g. DBMS, Networking, or Cloud notes) first")
-        print("    via the web interface or run `python ingest_sample_docs.py`.")
-        print("=" * 80)
-        return
+    for query, query_rows in query_groups.items():
+        expected_chunks = {
+            (row["source"].strip(), row["chunk_id"].strip())
+            for row in query_rows
+            if row["source"].strip().lower() != "none"
+        }
+        reference_answers = list(dict.fromkeys(row["answer"].strip() for row in query_rows))
+        reference_answer = "\n".join(reference_answers)
+        started = time.perf_counter()
+        response = execute_rag_pipeline(question=query)
+        latency_ms = (time.perf_counter() - started) * 1000
 
-    print("\nRunning benchmark across 5 questions (4 relevant + 1 negative refusal test):\n")
-
-    results_summary: List[Dict[str, Any]] = []
-
-    for item in SAMPLE_QUESTIONS:
-        q_id = item["id"]
-        q_text = item["question"]
-        topic = item["topic"]
-        expected_rel = item["expected_relevant"]
-        target_doc = item["target_doc"]
-        target_page = item["target_page"]
-
-        print(f"[{q_id}] Query: \"{q_text}\"")
-        print(f"     Topic: {topic}")
-        print(f"     Expected Behavior: {'Retrieve relevant document chunks' if expected_rel else 'REJECT / Zero Hallucination Guardrail'}")
-
-        start_time = time.perf_counter()
-        retrieved = retrieve_relevant_chunks(
-            query=q_text,
-            top_k=settings.TOP_K,
-            score_threshold=settings.SCORE_THRESHOLD
+        citations = response.sources
+        top_source = citations[0] if citations else None
+        actual_source = top_source.document if top_source else "none"
+        matching_citations = [
+            citation for citation in citations
+            if (Path(citation.document).name, str(citation.chunk_index)) in {
+                (Path(source).name, chunk_id)
+                for source, chunk_id in expected_chunks
+            }
+        ]
+        retrieval_score = max(
+            (float(citation.score or 0.0) for citation in matching_citations),
+            default=0.0,
         )
-        latency_ms = (time.perf_counter() - start_time) * 1000
-
-        # Evaluate correctness
-        if expected_rel:
-            # Positive test: must retrieve >= 1 chunk above threshold, top chunk should match target doc & page
-            has_chunks = len(retrieved) > 0
-            doc_matched = has_chunks and (retrieved[0][0].metadata.get("filename") == target_doc)
-            page_matched = has_chunks and (retrieved[0][0].metadata.get("page") == target_page)
-            passed = has_chunks and doc_matched
-            reason = f"Retrieved {len(retrieved)} chunk(s). Top cited: [{retrieved[0][0].metadata.get('filename') if has_chunks else 'None'} | Page {retrieved[0][0].metadata.get('page') if has_chunks else 'None'}]"
+        if not expected_chunks:
+            retrieval_pass = not citations
         else:
-            # Negative control test: MUST retrieve 0 chunks above threshold to prevent hallucination
-            passed = len(retrieved) == 0
-            reason = f"Correctly blocked ({len(retrieved)} chunks passed threshold). Refusal guardrail active." if passed else f"FAILED: Retrieved {len(retrieved)} false positive chunk(s)!"
+            retrieval_pass = (
+                bool(matching_citations)
+                and retrieval_score >= settings.SCORE_THRESHOLD
+            )
 
-        status_label = "PASS" if passed else "FAIL"
-        top_score = retrieved[0][1] if retrieved else 0.0
-
-        print(f"     Status: {status_label} ({reason})")
-        print(f"     Top Score: {top_score:.4f} | Latency: {latency_ms:.1f}ms")
-
-        if retrieved:
-            for idx, (chunk, score) in enumerate(retrieved[:2], 1):
-                doc_name = chunk.metadata.get("filename", "Unknown")
-                page = chunk.metadata.get("page", "?")
-                snippet = chunk.page_content.replace("\n", " ")[:80]
-                print(f"       -> Chunk #{idx}: [{doc_name} | Page {page}] (Score: {score:.4f}) \"{snippet}...\"")
-
-        print("-" * 80)
-        results_summary.append({
-            "id": q_id,
-            "passed": passed,
-            "expected_relevant": expected_rel,
-            "chunks": len(retrieved),
-            "top_score": top_score,
-            "latency_ms": latency_ms
+        quality_score = _answer_quality_score(response.answer, reference_answer)
+        quality_pass = quality_score >= ANSWER_QUALITY_THRESHOLD
+        latency_pass = latency_ms <= LATENCY_THRESHOLD_MS
+        results.append({
+            "evaluated_at": evaluated_at,
+            "query": query,
+            "expected_source": ";".join(sorted({source for source, _ in expected_chunks})) or "none",
+            "retrieved_source": actual_source,
+            "retrieval_score": round(retrieval_score, 6),
+            "retrieval_pass": retrieval_pass,
+            "answer_quality_score": round(quality_score, 6),
+            "answer_quality_pass": quality_pass,
+            "end_to_end_latency_ms": round(latency_ms, 2),
+            "latency_pass": latency_pass,
+            "overall_pass": retrieval_pass and quality_pass and latency_pass,
+            "answer": response.answer,
         })
 
-    # Summary table
-    print("\n" + "=" * 80)
-    print(" BENCHMARK EVALUATION SUMMARY")
-    print("=" * 80)
-    total_passed = sum(1 for r in results_summary if r["passed"])
-    positive_passed = sum(1 for r in results_summary if r["passed"] and r["expected_relevant"])
-    negative_passed = sum(1 for r in results_summary if r["passed"] and not r["expected_relevant"])
-    avg_latency = sum(r["latency_ms"] for r in results_summary) / len(results_summary)
+    RESULTS_DIR.mkdir(parents=True, exist_ok=True)
+    results_path = RESULTS_DIR / "results.csv"
+    summary_path = RESULTS_DIR / "summary.md"
+    timestamped_results_path = RESULTS_DIR / f"results_{run_id}.csv"
+    timestamped_summary_path = RESULTS_DIR / f"summary_{run_id}.md"
+    fieldnames = list(results[0].keys())
 
-    print(f"Overall Benchmark Score : {total_passed} / {len(SAMPLE_QUESTIONS)} ({total_passed / len(SAMPLE_QUESTIONS) * 100:.1f}%)")
-    print(f"Positive Retrieval Rate : {positive_passed} / 4 ({positive_passed / 4 * 100:.1f}%)")
-    print(f"Refusal Guardrail Rate  : {negative_passed} / 1 ({negative_passed / 1 * 100:.1f}%)")
-    print(f"Average Search Latency  : {avg_latency:.1f}ms")
-    print("=" * 80)
+    if results_path.exists():
+        shutil.copy2(
+            results_path,
+            RESULTS_DIR / f"results_previous_{run_id}.csv",
+        )
+    if summary_path.exists():
+        shutil.copy2(
+            summary_path,
+            RESULTS_DIR / f"summary_previous_{run_id}.md",
+        )
+
+    with timestamped_results_path.open("w", encoding="utf-8", newline="") as results_file:
+        writer = csv.DictWriter(results_file, fieldnames=fieldnames)
+        writer.writeheader()
+        writer.writerows(results)
+    shutil.copy2(timestamped_results_path, results_path)
+
+    passed = sum(bool(result["overall_pass"]) for result in results)
+    average_latency = statistics.mean(
+        float(result["end_to_end_latency_ms"]) for result in results
+    )
+    average_quality = statistics.mean(
+        float(result["answer_quality_score"]) for result in results
+    )
+    summary = f"""# RAG Evaluation Summary
+
+- Evaluated at: {evaluated_at}
+- Dataset rows: {len(results)}
+- Overall pass rate: {passed}/{len(results)} ({passed / len(results):.1%})
+- Average end-to-end latency: {average_latency:.2f} ms
+- Average reference-token recall: {average_quality:.3f}
+
+## Pass thresholds
+
+- Retrieval: at least one dataset-listed source/chunk is cited with a score at least `{settings.SCORE_THRESHOLD:.2f}`; control rows with source `none` must have no citations.
+- Answer quality: reference-token recall is at least `{ANSWER_QUALITY_THRESHOLD:.2f}`. This is a lexical heuristic, not a semantic faithfulness guarantee.
+- Latency: complete query-to-answer pipeline is at most `{LATENCY_THRESHOLD_MS:.0f} ms`.
+
+Detailed per-query records (including the timestamp) are appended to [results.csv](./results.csv).
+"""
+    timestamped_summary_path.write_text(summary, encoding="utf-8")
+    shutil.copy2(timestamped_summary_path, summary_path)
+    print(f"Evaluation completed: {passed}/{len(results)} passed.")
+    print(f"Saved results to {results_path} and summary to {RESULTS_DIR / 'summary.md'}.")
 
 
 if __name__ == "__main__":

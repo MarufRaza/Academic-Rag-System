@@ -1,0 +1,10 @@
+column_name,type,description
+doc_id,string,Stable identifier derived from the source document content hash.
+doc_type,string,"Source document type, such as pdf or docx."
+source,string,Source document filename.
+chunk_id,string,Zero-indexed chunk identifier within the source document.
+chunk_text,string,Text content of the retrieved document chunk.
+embedding_model,string,Embedding provider and model used to index the chunks.
+retrieval_score,float,Chroma relevance score for this chunk and query.
+query,string,Benchmark question used to retrieve the chunk.
+answer,string,Reference answer excerpt copied from the retrieved source chunk.
