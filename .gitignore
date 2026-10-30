@@ -59,3 +59,48 @@ yarn-error.log*
 .DS_Store
 Thumbs.db
 Desktop.ini
+
+# ---- Additions ----
+
+# More secret variants (keep the example files committed)
+.env.*
+!.env.example
+!backend/.env.example
+*.env
+secrets/
+credentials.json
+service-account*.json
+
+# Test / tooling caches
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.coverage
+htmlcov/
+
+# Local database and data files
+backend/uploads/documents_manifest.json
+*.sqlite3
+*.db
+
+# Logs
+*.log
+logs/
+
+# My local debug / helper scripts
+backend/view_db.py
+backend/test_key.py
+backend/test_models.py
+backend/installed.txt
+
+# Other editor / OS junk
+*.code-workspace
+.cursor/
+.antigravity/
+.gemini/
+.claude/
+evaluation_results/
+all_code.txt
+all_code_old.txt
+project_code.html
+project_with_structure.txt
