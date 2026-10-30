@@ -1,5 +1,5 @@
 import os
-from app.rag.loader import load_and_preprocess_pdf
+from app.rag.loader import load_and_preprocess_document
 from app.rag.splitter import split_documents
 from app.rag.vectorstore import add_documents_to_vectorstore, delete_documents_by_id
 from app.utils.file_utils import compute_file_hash, format_file_size
@@ -12,7 +12,8 @@ def ingest_samples():
     files = [
         ("DBMS_Study_Notes.pdf", "sample-dbms-001"),
         ("Computer_Networks_Guide.pdf", "sample-net-002"),
-        ("Cloud_Computing_Essentials.pdf", "sample-cloud-003")
+        ("Cloud_Computing_Essentials.pdf", "sample-cloud-003"),
+        ("RAG_Docx_Sample.docx", "sample-docx-004"),
     ]
 
     for fname, doc_id in files:
@@ -29,7 +30,7 @@ def ingest_samples():
         with open(dest_path, "wb") as f:
             f.write(b)
 
-        pages = load_and_preprocess_pdf(dest_path, fname)
+        pages = load_and_preprocess_document(dest_path, fname)
         chunks = split_documents(pages, doc_id, fname, file_hash)
         added = add_documents_to_vectorstore(chunks)
 
