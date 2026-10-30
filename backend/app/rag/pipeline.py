@@ -1,9 +1,11 @@
+﻿import itertools
+import json
 from typing import List, Optional
 from app.core.config import settings
 from app.core.exceptions import EmptyQuestionException
 from app.core.logging import logger
 from app.models.chat import ChatMessage, ChatResponse, SourceCitation
-from app.rag.generator import get_llm, invoke_llm_safely, translate_llm_exception
+from app.rag.generator import extract_text_content, get_llm, invoke_llm_safely, translate_llm_exception
 from app.rag.prompts import ACADEMIC_RAG_PROMPT, CONDENSE_QUESTION_PROMPT
 from app.rag.retriever import retrieve_relevant_chunks
 
@@ -132,6 +134,7 @@ def execute_rag_pipeline(
             sources.append(SourceCitation(
                 document=doc_name,
                 page=page_num,
+                chunk_index=int(doc.metadata.get("chunk_index", 0)),
                 content=content_snippet,
                 score=round(score, 4)
             ))
@@ -157,8 +160,6 @@ def stream_rag_pipeline(
     - {"type": "sources", "sources": [...]}
     - {"type": "done"}
     """
-    import json
-
     cleaned_question = question.strip() if question else ""
     if not cleaned_question:
         raise EmptyQuestionException()
@@ -201,22 +202,55 @@ def stream_rag_pipeline(
             sources.append({
                 "document": doc_name,
                 "page": page_num,
+                "chunk_index": int(doc.metadata.get("chunk_index", 0)),
                 "content": content_snippet,
                 "score": round(score, 4)
             })
 
+    accumulated_text = ""
+    has_streamed = False
+
     try:
         llm = get_llm(temperature=0.1)
-        # Stream response tokens
-        for chunk in llm.stream(prompt_text):
-            token_text = chunk.content if hasattr(chunk, "content") else str(chunk)
+        model_name = (
+            getattr(llm, "model", None)
+            or getattr(llm, "model_name", None)
+            or "provider default"
+        )
+        logger.info(
+            f"Streaming LLM response using provider='{settings.LLM_PROVIDER}' model='{model_name}'."
+        )
+        stream_iter = iter(llm.stream(prompt_text))
+        first_chunk = next(stream_iter, None)
+
+        initial_items = [first_chunk] if first_chunk is not None else []
+        for chunk in itertools.chain(initial_items, stream_iter):
+            raw_content = chunk.content if hasattr(chunk, "content") else chunk
+            token_text = extract_text_content(raw_content)
             if token_text:
+                has_streamed = True
+                accumulated_text += token_text
                 yield f"data: {json.dumps({'type': 'token', 'content': token_text})}\n\n"
+
+        if not has_streamed:
+            logger.warning("Streaming completed with 0 text tokens. Falling back to default message.")
+            yield f"data: {json.dumps({'type': 'token', 'content': NOT_ENOUGH_INFO_MSG})}\n\n"
+            yield f"data: {json.dumps({'type': 'sources', 'sources': []})}\n\n"
+            yield f"data: {json.dumps({'type': 'done'})}\n\n"
+            return
+
     except Exception as e:
         rag_err = translate_llm_exception(e)
         logger.error(f"Streaming LLM error: {rag_err.detail}")
-        yield f"data: {json.dumps({'type': 'error', 'message': rag_err.detail})}\n\n"
+        reason = rag_err.detail.splitlines()[0].strip()
+        yield (
+            f"data: {json.dumps({'type': 'error', 'message': f'LLM service unavailable: {reason}'})}\n\n"
+        )
         return
+
+    # If the LLM itself determined the context doesn't contain enough info, clear sources
+    if NOT_ENOUGH_INFO_MSG.lower() in accumulated_text.lower():
+        sources = []
 
     # Send sources and completion signal
     yield f"data: {json.dumps({'type': 'sources', 'sources': sources})}\n\n"

@@ -30,9 +30,7 @@ def retrieve_relevant_chunks(
         )
     except Exception as e:
         logger.error(f"Similarity search failed: {e}")
-        # Fallback to standard similarity search if score method fails
-        raw_docs = vectorstore.similarity_search(query=query, k=top_k)
-        results_with_scores = [(doc, 0.5) for doc in raw_docs]
+        return []
 
     filtered_results: List[Tuple[Document, float]] = []
 
