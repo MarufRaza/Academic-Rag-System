@@ -17,7 +17,7 @@ from app.models.document import (
     DocumentUploadItemResponse,
     DocumentUploadResponse,
 )
-from app.rag.loader import load_and_preprocess_pdf
+from app.rag.loader import load_and_preprocess_document
 from app.rag.splitter import split_documents
 from app.rag.vectorstore import (
     add_documents_to_vectorstore,
@@ -28,7 +28,7 @@ from app.utils.file_utils import (
     compute_file_hash,
     format_file_size,
     sanitize_filename,
-    validate_pdf,
+    validate_document,
 )
 from app.utils.manifest import (
     add_document_to_manifest,
@@ -42,15 +42,15 @@ from app.utils.manifest import (
 class DocumentService:
     @staticmethod
     async def process_and_index_upload(file: UploadFile) -> DocumentUploadItemResponse:
-        """Processes a single uploaded PDF file and indexes its chunks."""
+        """Processes a single uploaded PDF or DOCX file and indexes its chunks."""
         filename = sanitize_filename(file.filename or "uploaded.pdf")
         logger.info(f"Starting processing for file: {filename}")
 
         # Read content bytes
         content_bytes = await file.read()
 
-        # Step 1: Validate PDF constraints (magic bytes, size, extension)
-        validate_pdf(filename, content_bytes, settings.MAX_FILE_SIZE_MB)
+        # Step 1: Validate file signature, size, and supported extension
+        validate_document(filename, content_bytes, settings.MAX_FILE_SIZE_MB)
 
         # Step 2: Content Hash & Duplicate Detection
         file_hash = compute_file_hash(content_bytes)
@@ -68,8 +68,8 @@ class DocumentService:
             f.write(content_bytes)
 
         try:
-            # Step 4: Load & clean text from PDF
-            page_docs = load_and_preprocess_pdf(disk_path, filename)
+            # Step 4: Load & clean text from the supported document format
+            page_docs = load_and_preprocess_document(disk_path, filename)
             page_count = len(page_docs)
 
             # Step 5: Split text into chunks
@@ -124,7 +124,7 @@ class DocumentService:
 
     @classmethod
     async def process_multiple_uploads(cls, files: List[UploadFile]) -> DocumentUploadResponse:
-        """Processes multiple uploaded PDF files in a batch."""
+        """Processes multiple uploaded PDF and DOCX files in a batch."""
         uploaded: List[DocumentUploadItemResponse] = []
         errors: List[str] = []
 
