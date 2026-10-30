@@ -5,9 +5,7 @@ export default function SourceCitations({ sources }) {
   const [expandedIndices, setExpandedIndices] = useState({});
   const [copiedSnippetIndex, setCopiedSnippetIndex] = useState(null);
 
-  if (!sources || sources.length === 0) {
-    return null;
-  }
+  const citationSources = Array.isArray(sources) ? sources : [];
 
   const toggleExpand = (idx) => {
     setExpandedIndices((prev) => ({
@@ -27,15 +25,19 @@ export default function SourceCitations({ sources }) {
       <div className="flex items-center justify-between mb-2">
         <span className="text-xs font-semibold text-slate-400 uppercase tracking-wider flex items-center">
           <FileText className="w-3.5 h-3.5 mr-1.5 text-indigo-400" />
-          Source Citations ({sources.length})
+          Sources ({citationSources.length})
         </span>
         <span className="text-[11px] text-slate-500">
-          Grounded directly in uploaded documents
+          Retrieved excerpts for verification
         </span>
       </div>
 
       <div className="space-y-2">
-        {sources.map((source, idx) => {
+        {citationSources.length === 0 ? (
+          <p className="rounded-lg bg-slate-900/70 border border-slate-800 px-3 py-2 text-xs text-slate-400">
+            No supporting sources found in the documents
+          </p>
+        ) : citationSources.map((source, idx) => {
           const isExpanded = !!expandedIndices[idx];
           const hasCopied = copiedSnippetIndex === idx;
           const scorePercent = source.score ? Math.round(source.score * 100) : null;
@@ -59,6 +61,9 @@ export default function SourceCitations({ sources }) {
                   </span>
                   <span className="px-1.5 py-0.5 rounded text-[11px] font-semibold bg-indigo-500/20 text-indigo-300 border border-indigo-500/30 shrink-0">
                     Page {source.page}
+                  </span>
+                  <span className="px-1.5 py-0.5 rounded text-[11px] font-medium bg-slate-700/70 text-slate-300 border border-slate-600/50 shrink-0">
+                    Chunk {source.chunk_index}
                   </span>
                   {scorePercent !== null && (
                     <span className="px-1.5 py-0.5 rounded text-[11px] font-medium bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 shrink-0 hidden sm:inline">

@@ -102,44 +102,56 @@ export default function ChatArea({ documentCount, onNotify }) {
             return updated;
           });
         },
-        onError: (err) => {
-          throw new Error(err);
-        },
       });
     } catch (err) {
-      // Fallback to standard blocking API call if stream encountered issues
-      try {
-        const response = await api.askQuestion(question, messages);
-        setMessages([
-          ...newMessages,
-          {
-            role: 'assistant',
-            content: response.answer,
-            sources: response.sources || [],
-            standalone_question: response.standalone_question,
-          },
-        ]);
-      } catch (fallbackErr) {
-        const errorMsg =
-          fallbackErr.response?.data?.message ||
-          fallbackErr.response?.data?.detail ||
-          fallbackErr.message ||
-          err.message ||
-          'Error retrieving answer.';
-
+      if (err.name === 'StreamResponseError') {
         onNotify({
           type: 'error',
-          message: errorMsg,
+          message: err.message,
         });
-
         setMessages([
           ...newMessages,
           {
             role: 'assistant',
-            content: `⚠️ **Request Error**: ${errorMsg}`,
+            content: err.message,
             sources: [],
           },
         ]);
+      } else {
+        // Fallback to standard blocking API call if the stream itself failed
+        try {
+          const response = await api.askQuestion(question, messages);
+          setMessages([
+            ...newMessages,
+            {
+              role: 'assistant',
+              content: response.answer,
+              sources: response.sources || [],
+              standalone_question: response.standalone_question,
+            },
+          ]);
+        } catch (fallbackErr) {
+          const errorMsg =
+            fallbackErr.response?.data?.message ||
+            fallbackErr.response?.data?.detail ||
+            fallbackErr.message ||
+            err.message ||
+            'Error retrieving answer.';
+
+          onNotify({
+            type: 'error',
+            message: errorMsg,
+          });
+
+          setMessages([
+            ...newMessages,
+            {
+              role: 'assistant',
+              content: `âš ï¸ **Request Error**: ${errorMsg}`,
+              sources: [],
+            },
+          ]);
+        }
       }
     } finally {
       setIsLoading(false);
@@ -205,7 +217,7 @@ export default function ChatArea({ documentCount, onNotify }) {
             </h3>
             <p className="text-xs text-slate-400 leading-relaxed mb-6">
               Ask anything about your uploaded study notes, lectures, and textbooks.
-              Answers are strictly grounded in your materials with exact page citations.
+              Answers use retrieved material and include source citations for you to verify.
             </p>
 
             {/* Clickable Example Questions */}

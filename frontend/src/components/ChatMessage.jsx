@@ -1,14 +1,33 @@
 import React, { useState } from 'react';
 import ReactMarkdown from 'react-markdown';
-import { User, Sparkles, Copy, Check, GitCommit } from 'lucide-react';
+import { User, Sparkles, Copy, Check, GitCommit, AlertTriangle } from 'lucide-react';
 import SourceCitations from './SourceCitations';
 
 export default function ChatMessage({ message }) {
   const [copied, setCopied] = useState(false);
-  const isUser = message.role === 'user';
+  const isUser = message?.role === 'user';
+  const rawContent = message?.content;
+
+  // Defensive validation of message content
+  let textContent = '';
+  let contentError = null;
+
+  if (typeof rawContent === 'string') {
+    textContent = rawContent;
+    if (!textContent.trim() && !isUser) {
+      contentError = 'No response generated. Please try again.';
+    }
+  } else if (rawContent === null || rawContent === undefined) {
+    contentError = isUser ? 'Empty message' : 'Empty response received from server.';
+  } else if (typeof rawContent === 'object') {
+    // If an object or list was somehow passed
+    contentError = 'Invalid response format received from server.';
+  } else {
+    textContent = String(rawContent);
+  }
 
   const copyContent = () => {
-    navigator.clipboard.writeText(message.content);
+    navigator.clipboard.writeText(textContent);
     setCopied(true);
     setTimeout(() => setCopied(false), 2000);
   };
@@ -22,7 +41,7 @@ export default function ChatMessage({ message }) {
           </div>
           <div className="bg-indigo-600 text-white rounded-2xl rounded-tr-none px-4 py-3 shadow-md">
             <p className="text-sm whitespace-pre-wrap leading-relaxed">
-              {message.content}
+              {textContent || (contentError && <span className="italic opacity-70">[{contentError}]</span>)}
             </p>
           </div>
         </div>
@@ -46,7 +65,7 @@ export default function ChatMessage({ message }) {
               <span className="text-xs font-bold text-indigo-300">
                 Academic AI Assistant
               </span>
-              {message.standalone_question && (
+              {message?.standalone_question && (
                 <span
                   title={`Condensed from conversation history: "${message.standalone_question}"`}
                   className="inline-flex items-center text-[10px] px-2 py-0.5 rounded-full bg-slate-700/70 text-slate-300 border border-slate-600/50"
@@ -79,35 +98,42 @@ export default function ChatMessage({ message }) {
 
           {/* Formatted Markdown Content */}
           <div className="prose prose-invert prose-sm max-w-none text-slate-200 leading-relaxed space-y-3">
-            <ReactMarkdown
-              components={{
-                p: ({ children }) => <p className="mb-2 leading-relaxed text-sm text-slate-200">{children}</p>,
-                ul: ({ children }) => <ul className="list-disc pl-5 mb-2 space-y-1 text-sm text-slate-200">{children}</ul>,
-                ol: ({ children }) => <ol className="list-decimal pl-5 mb-2 space-y-1 text-sm text-slate-200">{children}</ol>,
-                li: ({ children }) => <li className="text-sm text-slate-200">{children}</li>,
-                h1: ({ children }) => <h1 className="text-base font-bold text-white mt-3 mb-1">{children}</h1>,
-                h2: ({ children }) => <h2 className="text-sm font-bold text-white mt-2.5 mb-1">{children}</h2>,
-                h3: ({ children }) => <h3 className="text-xs font-bold text-white mt-2 mb-1">{children}</h3>,
-                code: ({ node, inline, children, ...props }) => {
-                  return inline ? (
-                    <code className="bg-slate-900 text-indigo-300 px-1.5 py-0.5 rounded text-xs font-mono" {...props}>
-                      {children}
-                    </code>
-                  ) : (
-                    <pre className="bg-slate-900/90 text-slate-200 p-3 rounded-lg overflow-x-auto text-xs font-mono border border-slate-700/60 my-2">
-                      <code>{children}</code>
-                    </pre>
-                  );
-                },
-                strong: ({ children }) => <strong className="font-semibold text-white">{children}</strong>,
-              }}
-            >
-              {message.content}
-            </ReactMarkdown>
+            {contentError ? (
+              <div className="flex items-center space-x-2 p-3 rounded-lg bg-amber-950/40 border border-amber-800/50 text-amber-300 text-sm">
+                <AlertTriangle className="w-4 h-4 shrink-0 text-amber-400" />
+                <span>{contentError}</span>
+              </div>
+            ) : (
+              <ReactMarkdown
+                components={{
+                  p: ({ children }) => <p className="mb-2 leading-relaxed text-sm text-slate-200">{children}</p>,
+                  ul: ({ children }) => <ul className="list-disc pl-5 mb-2 space-y-1 text-sm text-slate-200">{children}</ul>,
+                  ol: ({ children }) => <ol className="list-decimal pl-5 mb-2 space-y-1 text-sm text-slate-200">{children}</ol>,
+                  li: ({ children }) => <li className="text-sm text-slate-200">{children}</li>,
+                  h1: ({ children }) => <h1 className="text-base font-bold text-white mt-3 mb-1">{children}</h1>,
+                  h2: ({ children }) => <h2 className="text-sm font-bold text-white mt-2.5 mb-1">{children}</h2>,
+                  h3: ({ children }) => <h3 className="text-xs font-bold text-white mt-2 mb-1">{children}</h3>,
+                  code: ({ node, inline, children, ...props }) => {
+                    return inline ? (
+                      <code className="bg-slate-900 text-indigo-300 px-1.5 py-0.5 rounded text-xs font-mono" {...props}>
+                        {children}
+                      </code>
+                    ) : (
+                      <pre className="bg-slate-900/90 text-slate-200 p-3 rounded-lg overflow-x-auto text-xs font-mono border border-slate-700/60 my-2">
+                        <code>{children}</code>
+                      </pre>
+                    );
+                  },
+                  strong: ({ children }) => <strong className="font-semibold text-white">{children}</strong>,
+                }}
+              >
+                {textContent}
+              </ReactMarkdown>
+            )}
           </div>
 
           {/* Sources Section */}
-          {message.sources && message.sources.length > 0 && (
+          {!isUser && (
             <SourceCitations sources={message.sources} />
           )}
         </div>
