@@ -101,15 +101,22 @@ export const api = {
 
       for (const line of lines) {
         if (line.startsWith('data: ')) {
+          let data;
           try {
-            const data = JSON.parse(line.slice(6));
-            if (data.type === 'token' && onToken) onToken(data.content);
-            if (data.type === 'sources' && onSources) onSources(data.sources);
-            if (data.type === 'standalone' && onStandalone) onStandalone(data.question);
-            if (data.type === 'error' && onError) onError(data.message);
-          } catch (e) {
-            // Safe JSON parse ignore
+            data = JSON.parse(line.slice(6));
+          } catch {
+            continue;
           }
+
+          if (data.type === 'error') {
+            const streamError = new Error(data.message || 'LLM service unavailable.');
+            streamError.name = 'StreamResponseError';
+            if (onError) onError(streamError.message);
+            throw streamError;
+          }
+          if (data.type === 'token' && onToken) onToken(data.content);
+          if (data.type === 'sources' && onSources) onSources(data.sources);
+          if (data.type === 'standalone' && onStandalone) onStandalone(data.question);
         }
       }
     }
