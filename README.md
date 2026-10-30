@@ -8,7 +8,7 @@
 [![Python](https://img.shields.io/badge/Python-3.10%20%7C%203.11%20%7C%203.12%20%7C%203.13-3776AB?style=flat&logo=python&logoColor=white)](https://www.python.org)
 [![License](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
 
-An academic-grade **Retrieval-Augmented Generation (RAG)** web application designed for students, researchers, and educators. Upload lecture notes, syllabus documents, textbooks, and research papers (PDF) to ask deep technical questions. Answers are **strictly grounded** in your uploaded materials and include verifiable **source citations** (document name, 1-indexed page number, and text excerpts).
+An academic-grade **Retrieval-Augmented Generation (RAG)** web application designed for students, researchers, and educators. Upload lecture notes, syllabus documents, textbooks, and research papers (PDF or DOCX) to ask deep technical questions. Answers are generated from retrieved material and include source citations (document name, page, chunk ID, and text excerpts).
 
 Runs smoothly on standard 8GB RAM laptops (Windows/Linux/macOS) on CPU with zero local GPU requirements.
 
@@ -35,16 +35,18 @@ Runs smoothly on standard 8GB RAM laptops (Windows/Linux/macOS) on CPU with zero
 
 ## Key Features
 
-- **Real RAG Pipeline**: No mock or hallucinated responses. Built with official LangChain split packages (`langchain-chroma`, `langchain-huggingface`, `langchain-google-genai`, `langchain-openai`, `langchain-ollama`).
-- **Zero-Hallucination Guardrail**: A strict cosine similarity threshold prevents hallucinations. If retrieved chunks do not exceed the relevance threshold, the system immediately returns:  
+- **Grounded RAG Pipeline**: Uses retrieved document context and official LangChain split packages (`langchain-chroma`, `langchain-huggingface`, `langchain-google-genai`, `langchain-openai`, `langchain-ollama`).
+- **Relevance Threshold Guardrail**: If retrieved chunks do not exceed the relevance threshold, the system returns:
   `"I couldn't find enough information in the uploaded documents to answer this question."` without making an unnecessary LLM call.
-- **Accurate Source Citations**: Every generated answer specifies the source PDF filename, 1-indexed page number, relevance match score, and expandable text excerpt.
+- **Source Citations**: Responses show the source document, page, chunk ID, relevance score, and expandable text excerpt when retrieved.
 - **Content Hash & Duplicate Prevention**: SHA-256 content hashing detects duplicate uploads instantly, preventing redundant embeddings and storage waste.
 - **Conversational Context Condensation**: Multi-turn conversation history is condensed by the LLM into a standalone query before vector retrieval.
 - **CPU-Friendly & 8GB RAM Certified**: Default embeddings use `sentence-transformers/all-MiniLM-L6-v2` (only ~80MB), running locally on CPU.
-- **Provider Agnostic**: Switch seamlessly between OpenAI (`gpt-4o-mini`), Google Gemini (`gemini-2.5-flash`, free tier) and local private Ollama (`llama3.2:3b`), or swap embeddings between HuggingFace and OpenAI with a single `.env` toggle.
+- **Provider Agnostic**: Switch between OpenAI (`gpt-4o-mini`), Google Gemini (`gemini-3.8-flash`), and local Ollama (`llama3.2:3b`), or swap embeddings between HuggingFace and OpenAI with a single `.env` toggle.
 - **Embedding Mismatch Protection**: Vector store embeds provider/model metadata signatures; mismatches trigger explicit warnings or safe resets.
-- **Modern Responsive UI**: Clean academic dark aesthetic with drag-and-drop PDF ingestion, real-time progress indicators, copy actions, and clickable sample questions.
+- **Modern Responsive UI**: Clean academic dark aesthetic with drag-and-drop PDF/DOCX ingestion, real-time progress indicators, copy actions, and clickable sample questions.
+
+> **Important:** This system may produce inaccurate or hallucinated answers. Always verify against the source excerpts shown. Do not use for legal or medical advice without expert review.
 
 ---
 
@@ -75,7 +77,7 @@ Runs smoothly on standard 8GB RAM laptops (Windows/Linux/macOS) on CPU with zero
                       v                                  v
 +---------------------+-------------+     +-------------------------------+
 |          EMBEDDING LAYER          |     |           LLM LAYER           |
-|  - HuggingFace (MiniLM-L6-v2)     |     |  - Gemini (gemini-2.5-flash)  |
+|  - HuggingFace (MiniLM-L6-v2)     |     |  - Gemini (gemini-3.8-flash) |
 |  - OpenAI (text-embedding-3-small)|     |  - OpenAI (gpt-4o-mini)       |
 |                                   |     |  - Ollama (llama3.2:3b local) |
 +---------------------+-------------+     +-------------------------------+
@@ -94,16 +96,16 @@ Runs smoothly on standard 8GB RAM laptops (Windows/Linux/macOS) on CPU with zero
 ## RAG Pipeline Workflow
 
 ```text
-[PDF Upload]
+[PDF or DOCX Upload]
      |
      v
-[Validation: .pdf + MIME + %PDF- Magic Bytes + Size <= 25MB]
+[Validation: PDF/DOCX signature + extension + Size <= 25MB]
      |
      v
 [SHA-256 Hash Calculation] ---> Duplicate Found? ---> Abort with Conflict (409)
      |
      v
-[PyPDFLoader Page-by-Page Extraction]
+[PyPDFLoader / Docx2txtLoader Extraction]
      |
      v
 [Text Cleaning: Hyphenation fixes, control chars removed, whitespace normalized]
@@ -157,6 +159,7 @@ Runs smoothly on standard 8GB RAM laptops (Windows/Linux/macOS) on CPU with zero
   - `langchain-openai`: OpenAI GPT & embedding integration
   - `langchain-ollama`: Local offline LLM execution
 - **PyPDF**: PDF parsing and text stream decoding
+- **Docx2txt**: Word document text extraction
 - **ChromaDB**: Lightweight, embedded, persistent vector database
 - **Sentence-Transformers & PyTorch**: Lightweight local embedding model (`all-MiniLM-L6-v2`)
 
@@ -192,7 +195,7 @@ academic-rag-system/
 │   │   │   ├── cleaner.py          # PDF text normalizer & hyphenation fixer
 │   │   │   ├── embeddings.py       # Singleton embedding factory
 │   │   │   ├── generator.py        # LLM factory (Gemini / OpenAI / Ollama)
-│   │   │   ├── loader.py           # PyPDFLoader wrapper with validation
+│   │   │   ├── loader.py           # PDF/DOCX loader and text normalization
 │   │   │   ├── pipeline.py         # End-to-end RAG orchestrator
 │   │   │   ├── prompts.py          # Academic system prompt & condenser
 │   │   │   ├── retriever.py        # Vector search with score thresholding
@@ -211,7 +214,7 @@ academic-rag-system/
 │   │   └── test_gemini.py          # Gemini provider unit tests
 │   ├── uploads/                    # Physical PDF storage directory
 │   ├── create_sample_academic_pdfs.py # Generator for multi-page study PDFs
-│   ├── evaluate.py                 # 5 benchmark evaluation questions
+│   ├── evaluate.py                 # Dataset-based retrieval and answer evaluation
 │   ├── ingest_sample_docs.py       # Helper to seed sample PDFs
 │   ├── test_backend_pipeline.py    # Automated pipeline unit verification
 │   ├── requirements.txt            # Pinned Python dependencies
@@ -238,6 +241,11 @@ academic-rag-system/
 │   ├── nginx.conf                  # Production Nginx reverse proxy
 │   └── Dockerfile                  # Multi-stage production container
 ├── docker-compose.yml              # Multi-container orchestration
+├── scripts/build_dataset.py        # Build retrieval benchmark dataset from sample documents
+├── notebooks/eda.ipynb             # Dataset exploratory analysis and visualizations
+├── docs/figures/                    # Exported EDA plot PNGs
+├── dataset.csv                     # Cleaned retrieval/answer reference dataset
+├── data_dictionary.csv             # Dataset column descriptions
 ├── .env.example                    # Global environment variables template
 ├── .gitignore                      # Git exclusion rules (.env, chroma_db, etc.)
 └── README.md                       # Comprehensive documentation
@@ -261,7 +269,7 @@ cp .env.example backend/.env
 | `OPENAI_API_KEY` | *(empty)* | OpenAI API key (sk-...) |
 | `OPENAI_MODEL` | `gpt-4o-mini` | OpenAI chat model name |
 | `GOOGLE_API_KEY` | *(empty)* | Google Gemini API key (never commit this value) |
-| `GEMINI_MODEL` | `gemini-2.5-flash` | Gemini chat model name |
+| `GEMINI_MODEL` | `gemini-3.8-flash` | Gemini chat model name; environment settings can override the default |
 | `OLLAMA_MODEL` | `llama3.2:3b` | Ollama model name (e.g., `llama3.2:3b`, `mistral`) |
 | `OLLAMA_BASE_URL` | `http://localhost:11434` | Ollama server API URL |
 | `EMBEDDING_PROVIDER` | `huggingface` | Active embedding provider: `huggingface` or `openai` |
@@ -271,7 +279,7 @@ cp .env.example backend/.env
 | `CHUNK_OVERLAP` | `150` | Overlap between consecutive chunks in characters |
 | `TOP_K` | `4` | Number of most similar chunks to retrieve |
 | `SCORE_THRESHOLD` | `0.30` | Minimum cosine similarity score for relevance |
-| `MAX_FILE_SIZE_MB` | `25` | Maximum allowed PDF upload size in megabytes |
+| `MAX_FILE_SIZE_MB` | `25` | Maximum allowed PDF or DOCX upload size in megabytes |
 
 ---
 
@@ -284,12 +292,12 @@ In `backend/.env`:
 ```env
 LLM_PROVIDER=gemini
 GOOGLE_API_KEY=your_google_api_key_here
-GEMINI_MODEL=gemini-2.5-flash
+GEMINI_MODEL=gemini-3.8-flash
 
 EMBEDDING_PROVIDER=huggingface
 HF_EMBEDDING_MODEL=sentence-transformers/all-MiniLM-L6-v2
 ```
-*Benefits*: 100% free cloud LLM using Google's `gemini-2.5-flash` with strong reasoning and rapid generation. See the [Using Gemini (free)](#using-gemini-free) section below for key setup, configuration details, and rate limit tips.
+*Benefits*: Google Gemini cloud generation using the configured `GEMINI_MODEL` (default: `gemini-3.8-flash`). Availability and pricing depend on the Google AI account and model access. See the [Using Gemini](#using-gemini-free) section for configuration and rate-limit details.
 
 ### 2. OpenAI (Cloud Configuration)
 In `backend/.env`:
@@ -349,13 +357,15 @@ Gemini is the default LLM provider. Embeddings stay on HuggingFace so existing C
 ```env
 LLM_PROVIDER=gemini
 GOOGLE_API_KEY=your_google_api_key_here
-GEMINI_MODEL=gemini-2.5-flash
+GEMINI_MODEL=gemini-3.8-flash
 
 EMBEDDING_PROVIDER=huggingface
 HF_EMBEDDING_MODEL=sentence-transformers/all-MiniLM-L6-v2
 ```
 
-3. Restart the backend. `GET /api/health` should report `llm_provider: gemini` and `llm_model: gemini-2.5-flash` (the key is never returned).
+3. Restart the backend. Startup checks the configured model against the Gemini model list and logs a warning with the closest available suggestion if it is unavailable. `GET /api/health` should report `llm_provider: gemini` and `llm_model: gemini-3.8-flash` (the key is never returned).
+
+The code default is `gemini-3.8-flash`; `GEMINI_MODEL` supplied through the process environment or `backend/.env` takes precedence. The application does not silently retry with another model: model/API errors are returned explicitly, and successful answer calls log the provider and model. Check the [official model list](https://ai.google.dev/gemini-api/docs/models) and ensure the selected model is available to your API project.
 
 **429 troubleshooting**: The Gemini free tier is rate-limited. If you see `"Gemini free-tier rate limit reached. Please wait a minute and try again."`, wait about a minute and retry. Do not paste your API key into chat, logs, or the frontend.
 
@@ -481,7 +491,7 @@ curl -X GET http://127.0.0.1:8000/api/health
 {
   "status": "ok",
   "llm_provider": "gemini",
-  "llm_model": "gemini-2.5-flash",
+  "llm_model": "gemini-3.8-flash",
   "embedding_provider": "huggingface",
   "embedding_model": "sentence-transformers/all-MiniLM-L6-v2",
   "document_count": 3,
@@ -494,11 +504,12 @@ curl -X GET http://127.0.0.1:8000/api/health
 
 ---
 
-### 2. Upload Academic PDFs (Multipart)
+### 2. Upload Academic PDFs or DOCX files (Multipart)
 ```bash
 curl -X POST http://127.0.0.1:8000/api/documents/upload \
   -F "files=@sample_documents/DBMS_Study_Notes.pdf"
 ```
+Use the same endpoint with `-F "files=@path/to/notes.docx"` to upload a Word document.
 **Response**:
 ```json
 {
@@ -591,7 +602,7 @@ curl -X POST http://127.0.0.1:8000/api/chat \
 
 ---
 
-### 6. Irrelevant Question (Zero Hallucination Guardrail)
+### 6. Irrelevant Question (Relevance Threshold Response)
 ```bash
 curl -X POST http://127.0.0.1:8000/api/chat \
   -H "Content-Type: application/json" \
@@ -613,26 +624,23 @@ curl -X POST http://127.0.0.1:8000/api/chat \
 
 ## Evaluation Harness
 
-A dedicated evaluation harness is provided in `backend/evaluate.py` to evaluate retrieval precision, cosine scores, and response latency across 5 benchmark academic questions.
+`backend/evaluate.py` reads query/reference rows from `dataset.csv`, evaluates retrieval source/score, reference-answer keyword overlap, and end-to-end response latency, and records timestamped results in `evaluation_results/results.csv` and `evaluation_results/summary.md`. The answer-quality score is token recall against the retrieved reference excerpt; it is a lightweight heuristic, not a human or model-based faithfulness assessment.
 
-To run the evaluation:
+From the repository root, build the retrieval dataset from sample documents and run the evaluation:
 ```powershell
-cd backend
-python evaluate.py
+python scripts/build_dataset.py
+python backend/evaluate.py
 ```
 
-### Benchmark Questions Included:
-1. **DBMS**: *"What is database normalization and what are the benefits of 3NF?"* (Target: `DBMS_Study_Notes.pdf`, Page 2)
-2. **Computer Networks**: *"Explain the 7 layers of the OSI model and their key responsibilities."* (Target: `Computer_Networks_Guide.pdf`, Page 2)
-3. **Transport Layer**: *"What is the key difference between TCP and UDP in terms of reliability and overhead?"* (Target: `Computer_Networks_Guide.pdf`, Page 3)
-4. **Cloud Computing**: *"Explain the core service models of cloud computing: IaaS, PaaS, and SaaS."* (Target: `Cloud_Computing_Essentials.pdf`, Page 2)
-5. **Operating Systems (Unanswerable control query)**: *"What is the difference between preemptive and non-preemptive CPU scheduling algorithms?"* (Target: Below threshold, correctly blocked)
+The dataset builder uses the configured embedding provider to retrieve sample chunks and stores each retrieved source excerpt as a reference answer. The evaluation invokes the configured LLM to produce answers. Configure the selected provider before running evaluation; dataset generation does not invoke an LLM.
+
+The notebook `notebooks/eda.ipynb` contains four executed plots. PNG exports are saved under `docs/figures/`. To reproduce them, open and run the notebook from the repository root after installing `backend/requirements.txt`.
 
 ---
 
 ## Storage Locations
 
-- **Uploaded PDFs**: Stored on disk under `backend/uploads/` (prefixed with document UUID to prevent file collisions).
+- **Uploaded PDFs and DOCX files**: Stored on disk under `backend/uploads/` (prefixed with document UUID to prevent file collisions).
 - **Persistent ChromaDB Vectors**: Stored on disk under `backend/chroma_db/` (HNSW SQLite index and binary embeddings).
 - **Document Metadata Registry**: Stored in `backend/uploads/documents_manifest.json`.
 
