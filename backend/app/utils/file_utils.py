@@ -1,6 +1,8 @@
 import hashlib
+import io
 import os
 import re
+import zipfile
 from typing import Tuple
 from app.core.config import settings
 from app.core.exceptions import InvalidPDFException, FileTooLargeException
@@ -53,3 +55,30 @@ def validate_pdf(filename: str, file_bytes: bytes, max_mb: int = settings.MAX_FI
     header_preview = file_bytes[:1024]
     if b"%PDF" not in header_preview:
         raise InvalidPDFException(filename, "File header does not match valid PDF magic bytes (%PDF)")
+
+
+def validate_document(filename: str, file_bytes: bytes, max_mb: int = settings.MAX_FILE_SIZE_MB) -> None:
+    """Validate an uploaded PDF or DOCX file before parsing it."""
+    if not file_bytes:
+        raise InvalidPDFException(filename, "Uploaded file is 0 bytes / empty")
+
+    size_mb = len(file_bytes) / (1024 * 1024)
+    if size_mb > max_mb:
+        raise FileTooLargeException(filename, size_mb, max_mb)
+
+    extension = os.path.splitext(filename)[1].lower()
+    if extension not in settings.ALLOWED_EXTENSIONS:
+        raise InvalidPDFException(filename, "File extension must be .pdf or .docx")
+
+    if extension == ".pdf":
+        if b"%PDF" not in file_bytes[:1024]:
+            raise InvalidPDFException(filename, "File header does not match valid PDF magic bytes (%PDF)")
+        return
+
+    try:
+        with zipfile.ZipFile(io.BytesIO(file_bytes)) as archive:
+            required_parts = {"[Content_Types].xml", "word/document.xml"}
+            if not required_parts.issubset(archive.namelist()):
+                raise InvalidPDFException(filename, "File is not a valid DOCX document")
+    except (zipfile.BadZipFile, OSError) as exc:
+        raise InvalidPDFException(filename, "File is not a valid DOCX document") from exc
