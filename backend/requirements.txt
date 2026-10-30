@@ -5,6 +5,7 @@ pydantic-settings==2.15.0
 python-multipart==0.0.32
 python-dotenv==1.2.4
 pypdf==6.19.0
+docx2txt>=0.8
 chromadb==1.5.9
 sentence-transformers==6.1.0
 torch>=2.2.0
@@ -24,3 +25,4 @@ rich>=13.0.0
 reportlab>=4.0.0
 pytest>=8.0.0
 pytest-asyncio>=0.23.0
+matplotlib>=3.8

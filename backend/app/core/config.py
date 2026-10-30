@@ -1,5 +1,6 @@
-import os
+﻿import os
 from typing import List, Optional
+from pydantic import model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -13,7 +14,7 @@ class Settings(BaseSettings):
     OPENAI_MODEL: str = "gpt-4o-mini"
 
     GOOGLE_API_KEY: Optional[str] = None
-    GEMINI_MODEL: str = "gemini-2.5-flash"
+    GEMINI_MODEL: str = "gemini-3.8-flash"
 
     OLLAMA_MODEL: str = "llama3.2:3b"
     OLLAMA_BASE_URL: str = "http://localhost:11434"
@@ -40,7 +41,7 @@ class Settings(BaseSettings):
 
     # Upload Constraints
     MAX_FILE_SIZE_MB: int = 25
-    ALLOWED_EXTENSIONS: List[str] = [".pdf"]
+    ALLOWED_EXTENSIONS: List[str] = [".pdf", ".docx"]
 
     # CORS
     CORS_ORIGINS: List[str] = [
@@ -56,6 +57,14 @@ class Settings(BaseSettings):
         env_file_encoding="utf-8",
         extra="ignore"
     )
+
+    @model_validator(mode="after")
+    def resolve_api_keys(self):
+        # Fallback if Google API key was entered under OPENAI_API_KEY in .env
+        if not self.GOOGLE_API_KEY or not self.GOOGLE_API_KEY.strip():
+            if self.OPENAI_API_KEY and not self.OPENAI_API_KEY.strip().startswith("sk-"):
+                self.GOOGLE_API_KEY = self.OPENAI_API_KEY.strip()
+        return self
 
 
 settings = Settings()

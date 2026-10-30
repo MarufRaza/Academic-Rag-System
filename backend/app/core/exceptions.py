@@ -7,10 +7,10 @@ class AcademicRAGException(HTTPException):
 
 
 class InvalidPDFException(AcademicRAGException):
-    def __init__(self, filename: str, reason: str = "Invalid PDF format or corrupted file"):
+    def __init__(self, filename: str, reason: str = "Invalid or corrupted file"):
         super().__init__(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail=f"Invalid PDF '{filename}': {reason}."
+            detail=f"Invalid document '{filename}': {reason}."
         )
 
 
@@ -18,7 +18,7 @@ class EmptyPDFException(AcademicRAGException):
     def __init__(self, filename: str):
         super().__init__(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail=f"The uploaded PDF '{filename}' contains 0 pages or is empty."
+            detail=f"The uploaded document '{filename}' contains no pages or is empty."
         )
 
 
@@ -26,7 +26,7 @@ class ScannedPDFException(AcademicRAGException):
     def __init__(self, filename: str):
         super().__init__(
             status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
-            detail=f"The uploaded PDF '{filename}' contains no extractable text. It appears to consist of scanned images or non-searchable raster pages. Please provide a PDF with digital text."
+            detail=f"The uploaded document '{filename}' contains no extractable text. Provide a document with searchable text."
         )
 
 
