@@ -114,12 +114,12 @@ export default function App() {
 
       {/* Footer */}
       <footer className="border-t border-slate-900 bg-slate-950 py-4 text-center text-xs text-slate-500">
-        <div className="max-w-7xl mx-auto px-4 flex flex-col sm:flex-row items-center justify-between gap-2">
+        <div className="max-w-7xl mx-auto px-4 flex flex-col items-center gap-2">
           <span>
-            Academic Question Answering System Using RAG &bull; Persistent ChromaDB + LangChain
+            Academic Question Answering System Using RAG &bull; Grounded responses with source citations
           </span>
-          <span className="text-slate-400">
-            CPU-Optimized &bull; Zero Hallucination Guarantee
+          <span role="note" className="max-w-4xl text-amber-300">
+            This system may produce inaccurate or hallucinated answers. Always verify against the source excerpts shown. Do not use for legal or medical advice without expert review.
           </span>
         </div>
       </footer>
