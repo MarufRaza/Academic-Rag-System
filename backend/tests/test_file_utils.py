@@ -1,5 +1,9 @@
+from io import BytesIO
+from zipfile import ZIP_DEFLATED, ZipFile
+
 import pytest
 from app.utils.file_utils import (
+    validate_document,
     validate_pdf,
     compute_file_hash,
     format_file_size,
@@ -50,3 +54,31 @@ def test_validate_pdf_too_large():
     huge_bytes = b"%PDF-" + b"0" * (1024 * 1024 + 100)
     with pytest.raises(FileTooLargeException):
         validate_pdf("huge.pdf", huge_bytes, max_mb=1)
+
+
+def _minimal_docx_bytes():
+    buffer = BytesIO()
+    with ZipFile(buffer, "w", compression=ZIP_DEFLATED) as archive:
+        archive.writestr("[Content_Types].xml", "<Types/>")
+        archive.writestr("word/document.xml", "<document/>")
+    return buffer.getvalue()
+
+
+def test_validate_document_accepts_pdf():
+    validate_document("notes.pdf", b"%PDF-1.4 document data")
+
+
+def test_validate_document_accepts_docx():
+    validate_document("notes.docx", _minimal_docx_bytes())
+
+
+def test_validate_document_rejects_malformed_docx():
+    with pytest.raises(InvalidPDFException) as exc:
+        validate_document("notes.docx", b"not a zip archive")
+    assert "valid docx" in str(exc.value.detail).lower()
+
+
+def test_validate_document_rejects_unsupported_extension():
+    with pytest.raises(InvalidPDFException) as exc:
+        validate_document("notes.txt", b"document")
+    assert ".pdf or .docx" in str(exc.value.detail).lower()
