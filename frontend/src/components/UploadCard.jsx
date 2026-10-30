@@ -35,22 +35,22 @@ export default function UploadCard({ onUploadSuccess, onNotify }) {
   };
 
   const handleFilesSelected = (files) => {
-    // Filter for PDFs
-    const pdfFiles = files.filter((f) => f.name.toLowerCase().endsWith('.pdf'));
-    const nonPdfs = files.filter((f) => !f.name.toLowerCase().endsWith('.pdf'));
+    // Filter for supported document formats.
+    const supportedFiles = files.filter((f) => /\.(pdf|docx)$/i.test(f.name));
+    const unsupportedFiles = files.filter((f) => !/\.(pdf|docx)$/i.test(f.name));
 
-    if (nonPdfs.length > 0) {
+    if (unsupportedFiles.length > 0) {
       onNotify({
         type: 'warning',
-        message: `Skipped ${nonPdfs.length} non-PDF file(s). Only .pdf documents are supported.`,
+        message: `Skipped ${unsupportedFiles.length} unsupported file(s). Only .pdf and .docx documents are supported.`,
       });
     }
 
-    if (pdfFiles.length === 0) return;
+    if (supportedFiles.length === 0) return;
 
     // Check size limit (25MB)
     const validFiles = [];
-    for (const f of pdfFiles) {
+    for (const f of supportedFiles) {
       if (f.size > 25 * 1024 * 1024) {
         onNotify({
           type: 'error',
@@ -73,7 +73,7 @@ export default function UploadCard({ onUploadSuccess, onNotify }) {
 
     setIsUploading(true);
     setUploadProgress(10);
-    setUploadStage('Validating PDF structures & magic bytes...');
+    setUploadStage('Validating PDF/DOCX structures & file signatures...');
 
     try {
       setUploadProgress(40);
@@ -129,7 +129,7 @@ export default function UploadCard({ onUploadSuccess, onNotify }) {
           Upload Study Material
         </h2>
         <span className="text-[11px] text-slate-400 font-medium">
-          Max 25MB • PDF Only
+          Max 25MB • PDF or DOCX
         </span>
       </div>
 
@@ -148,7 +148,7 @@ export default function UploadCard({ onUploadSuccess, onNotify }) {
         <input
           ref={fileInputRef}
           type="file"
-          accept=".pdf,application/pdf"
+          accept=".pdf,.docx,application/pdf,application/vnd.openxmlformats-officedocument.wordprocessingml.document"
           multiple
           onChange={handleFileInputChange}
           className="hidden"
@@ -160,7 +160,7 @@ export default function UploadCard({ onUploadSuccess, onNotify }) {
         </div>
 
         <p className="text-sm font-medium text-slate-200">
-          <span className="text-indigo-400 font-semibold hover:underline">Click to browse</span> or drag and drop PDFs
+          <span className="text-indigo-400 font-semibold hover:underline">Click to browse</span> or drag and drop PDFs or DOCX files
         </p>
         <p className="text-xs text-slate-500 mt-1">
           Lecture notes, academic textbooks, syllabi, or research papers
