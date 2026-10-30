@@ -13,8 +13,9 @@ class ChatRequest(BaseModel):
 
 
 class SourceCitation(BaseModel):
-    document: str = Field(..., description="Filename of the cited PDF")
+    document: str = Field(..., description="Filename of the cited document")
     page: int = Field(..., description="1-indexed page number in the original document")
+    chunk_index: int = Field(..., description="Zero-indexed chunk identifier within the document")
     content: str = Field(..., description="Excerpt or snippet from the page that supports the answer")
     score: Optional[float] = Field(default=None, description="Relevance score from similarity search")
 
