@@ -3,6 +3,7 @@ from contextlib import asynccontextmanager
 from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
+from starlette.concurrency import run_in_threadpool
 
 from app.api.chat import router as chat_router
 from app.api.documents import router as documents_router
@@ -11,6 +12,7 @@ from app.core.config import settings
 from app.core.exceptions import AcademicRAGException
 from app.core.logging import logger
 from app.rag.embeddings import get_embedding_function
+from app.rag.generator import check_gemini_model_availability
 from app.rag.vectorstore import get_or_create_vectorstore
 
 
@@ -35,6 +37,9 @@ async def lifespan(app: FastAPI):
         logger.info("ChromaDB vectorstore connection verified.")
     except Exception as e:
         logger.warning(f"Vectorstore initialization notice: {e}")
+
+    if settings.LLM_PROVIDER.lower() == "gemini":
+        await run_in_threadpool(check_gemini_model_availability)
 
     yield
 

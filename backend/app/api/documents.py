@@ -15,13 +15,13 @@ router = APIRouter(prefix="/documents", tags=["Documents"])
     "/upload",
     response_model=DocumentUploadResponse,
     status_code=status.HTTP_201_CREATED,
-    summary="Upload and index one or more academic PDF documents",
+    summary="Upload and index one or more academic PDF or DOCX documents",
 )
 async def upload_documents(
-    files: List[UploadFile] = File(..., description="PDF files to be processed and indexed")
+    files: List[UploadFile] = File(..., description="PDF or DOCX files to be processed and indexed")
 ):
     """
-    Accepts multiple PDF uploads, validates file constraints, extracts text,
+    Accepts multiple PDF or DOCX uploads, validates file constraints, extracts text,
     splits into chunks, creates vector embeddings, and registers them in ChromaDB.
     """
     return await DocumentService.process_multiple_uploads(files)
